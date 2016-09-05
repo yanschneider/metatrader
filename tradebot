@@ -1,0 +1,6351 @@
+//+------------------------------------------------------------------+
+//|                                                      TradeBot    |
+//|                             Copyright 2016 |Yannic Schneider     |
+//|                                                                  |
+//+------------------------------------------------------------------+
+#property copyright ""
+#property link      "yannicschneider.de"
+#property version   "2.12"
+#property strict     
+
+//Tasten Zuweisungen
+
+#define KEY_1 49
+#define KEY_2 50
+#define KEY_3 51
+#define KEY_4 52
+#define KEY_5 53
+#define KEY_6 54
+#define KEY_7 55
+#define KEY_8 56
+#define KEY_9 57 
+
+#define KEY_SHIFT 16
+
+#define KEY_A 65
+#define KEY_B 66
+#define KEY_C 67
+#define KEY_D 68
+#define KEY_E 69
+#define KEY_F 70
+#define KEY_G 71
+#define KEY_H 72
+#define KEY_I 73
+#define KEY_J 74
+#define KEY_K 75
+#define KEY_L 76
+#define KEY_M 77
+#define KEY_N 78
+#define KEY_O 79
+#define KEY_P 80
+#define KEY_Q 81
+#define KEY_R 82
+#define KEY_S 83
+#define KEY_T 84
+#define KEY_U 85
+#define KEY_V 86
+#define KEY_W 87
+#define KEY_X 88
+#define KEY_Y 89
+#define KEY_Z 90
+
+
+
+
+//Definitionen für OrderSelect
+#define p "pos"
+#define trades "trades"
+#define t "ticket"
+#define history "history"
+#define Ghigh "high"
+#define Glow "low"
+
+
+int magicTrend=1337;
+int magicGapCamp=1338;
+int magicAussenstab=1339;
+int magicStopOrder100=1340;
+int magicReverseCandle=1341;
+int magicMultipleCandle=1342;
+
+//Toggle Variablen für Tasten Shortcuts
+bool toggleHelp=false;
+bool toggleDaily=false;
+bool toggleWeekly=false;
+bool toggleMonthly= false;
+bool toggleHourly = false;
+bool toggle4Hourly= false;
+bool toggleAussenstabLines=false;
+bool shortCutsDeactivated=false;
+bool enableAFKSoundMode=false;
+bool enableOCTO=false; //One Cancels the Other
+bool enableAverageStopLossMode;
+
+//Variablen für die Anzeige
+bool displayTradingMethod=false;
+bool displayLots=false;
+bool displaySLandTP=false;
+int offset=0;
+int helpEntries=0;
+string textObjects[100];
+bool displayAverageOrderPrice=false;
+bool displayWinPercentage=false;
+bool displayOpenGaps=false;
+bool displayResistanceAndSupport=false;
+double gapHigh= 0;
+double gapLow = 0;
+string gapTime= "´N/A";
+double dailyHigh=0;
+double dailyLow=1000000;
+bool displayTrendLines=false;
+
+//Variablen für Orders
+double averageOrderPrice=0;
+double trendMin1 =1000000;
+double trendMin2 =1000000;
+double trendMax1 = 0;
+double trendMax2 = 0;
+bool korrekturDown=false;
+bool korrekturUp=false;
+double totalLots=0;
+double lotStorage[500];
+bool enableAussenstabOrder=true;
+double gapCollection[300];
+string gapTimeCollection[1000];
+double gapCamperHigh= 0;
+double gapCamperLow = 0;
+bool gapCamperDelete = false;
+bool gapCamperTrading= true;
+double balance=0;
+bool goodMorning =false; 
+double buyOrderCollection[500];
+double sellOrderCollection[500];
+
+//Variablen für Audio
+bool toggleSound1 = false;    //Verwendet für Außenstab
+bool toggleSound2 = false;    //Verwendet für Außenstab
+
+                              //Variablen für Chart Auflösung
+int chartHeight= 0;
+int chartWidth = 0;
+
+//Variablen für TimeFrame wechsel
+
+ENUM_TIMEFRAMES currentTimeFrame=0;
+
+bool aboveEMA=false; //über eingestelltem EMA?
+
+datetime oldBarTime; //Zeit von Bar 1, um Aktionen bei neuem abgeschlossenen Bar zu triggern
+
+int ASS; //Shift für den zu betrachtenden Aussenstab
+int oldASS; // Überprüfen ob Aussenstab gewechselt
+
+double newestClose=1;   //Schlusswert von Candle 1 -> der neueste Schlusswert also
+
+                        //Falls der angedachte Stoploss zu nah am aktuellen Kurs liegt
+//überprüfen wir die nächsten n Kerzen um einen passenden Low/High Wert zu finden
+//Empfohlener Wert = 10
+int maxCandleStopLoss=10;
+
+int openOrders=0;       // Anzahl der offenen Trades speichern
+
+double manualLots=0;
+
+int fastTakeProfit=5;   //Takeprofit für schnelle Order Aufgabe
+
+int fastStopLoss=10;  //Stoploss für schnelle Order Aufgabe   
+
+int input inLiveTest=1;   //Livetest auf dem Chart?
+
+double input inStartingBalance=45000;  //Anfangskapital
+
+double input inLots=0;  //ENTWEDER: mit festen Lots handeln?
+
+int input inLotsIncrease=1;   //ODER: Lots abhängig von Kontostand erhöhen? 
+
+input double inTakeProfit=0;   //fester TakeProfit Abstand
+
+input double inStopLoss=15; //fester Stoploss Abstand (vor Order Auslösung)
+
+int input inStopLossMethod=1;    //0: fester SL + Trailing | 1: Algorithmus SL
+
+int input inTradingMethod=1;  //----- Trend handeln? v1.1 -----
+
+double input inTrailingDistance=14;   //Abstand Trailing Trendhandel
+
+int input inUseCandleClose=0;   //Schlusskurse: 1 | Hoch/Tief : 0
+
+double input inSpreadDistance=1; //Abstand der Order zu Kurs
+
+int input inAussenStabTrading=0;   //----- Aussenstab handeln? v1.0 -----  
+
+double input inTrailingAussenstab=2; // Abstand Trailing Aussenstab
+
+double input inAussenStabMinSize=20; //Mindestgröße für Aussenstab
+
+int input inGapCamper=1; //----- GapCamper handeln? v1.0-----  
+
+int input inGapCamperDistance=10;   //Abstand von letzem Hoch/Tief des Tages
+
+double input inTrailingGapCamper=2; // Abstand Trailing GapCamper
+
+int input inReverseCandleTrader=0;   //----- Umkehrkerzen handeln? v1.0-----
+
+double input inReverseCandleMinRatio=4;    //Verhältnis von Docht zu Körper
+
+double input inReverseCandleMaxDistToBorder=2;   //Maximaler Abstand von Schluss zu High/Low
+
+double input inReverseCandleDistance=2;    //Abstand Trailing ReverseCandle
+
+int input inMultipleCandleTrader=1;  //----- Kerzen in Folge handeln? v1.0-----
+
+int input inConsiderNCandles=1;   //Kerzen in folge mit gleicher Farbe benötigt
+
+int input inDTMinCandleSize=5;  //Mindestgröße für betrachtete Kerzen
+
+double input inMultipleCandleDistance=2;   //Abstand Trailing MCTrader
+
+double input inMCSpreadDistance = 0;   //Abstand zu Order
+
+int input inMCTraderMaxOrders = 2; //Maximale Anzahl an Orders für MCTrader
+
+bool reverseCandleDown=false;
+
+double  stopLossMinDistance=5;    //ASS : Mindestentfernung für StopLoss wenn keine passende Kerze vorhanden
+
+bool manualTrailing=false;    //Trailingstop nachträglich aktivieren
+
+int inKeyShortcuts=1;
+
+double manualTrailingDistance=0;
+
+double cash=AccountBalance();
+
+bool oldAboveEMA=false;
+
+bool dailyBuy=false;
+bool dailySell=false;
+//+------------------------------------------------------------------+
+//|                Initialisierungen                                 |
+//+------------------------------------------------------------------+
+int OnInit()
+  {
+
+   createObjects();      //Chart Objekte erstellen
+
+   saveVariables();      //initiale Werte in Variablen speichern
+
+   initStopLoss();       //gewählte StopLoss Methode initialisieren
+
+   return(INIT_SUCCEEDED);     //Initialisierung erfolgreich
+
+  }
+//+------------------------------------------------------------------+
+//|        Aktionen bei Deinitialisierung                            |
+//+------------------------------------------------------------------+
+void OnDeinit(const int reason)
+  {
+
+   EventKillTimer();   //Timer deaktivieren
+
+  }
+//+------------------------------------------------------------------+
+//|           Aktion bei Timer Ablauf                                |
+//+------------------------------------------------------------------+
+void onTimer()
+  {
+
+   updateObjects();
+
+  }
+//+------------------------------------------------------------------+
+//|           Aktion bei Tasteneingabe                               |
+//+------------------------------------------------------------------+
+void OnChartEvent(const int id,// Event identifier  
+                  const long& lparam,   // Event parameter of long type
+                  const double& dparam, // Event parameter of double type
+                  const string& sparam) // Event parameter of string type
+  {
+
+   checkIfKeyPressed(id,lparam); //Überprüfe ob eine Taste gedrückt wurde und führe Aktion aus
+
+  }
+//+------------------------------------------------------------------+
+//|           Aktion bei Tick                                        |
+//+------------------------------------------------------------------+
+void OnTick()
+  {
+
+   newBarManagement();
+
+   timeFrameManagement();
+
+   stopLossManagement();
+
+   newOrderManagement();
+
+   lotManagement();
+
+   if(OrdersTotal()<1)
+     {
+
+      //dailyHighLowStrategy();
+
+     }
+
+   if(manualTrailing || inStopLossMethod==0)
+     {
+
+      trailingStopLoss();
+
+     }
+
+   soundManagement();
+
+   updateStatus();
+
+   updateObjects();
+
+   updateText();
+   
+   
+   
+
+
+  
+
+  }
+  
+  
+//+------------------------------------------------------------------+
+//|  Verwaltung von neuen Orders                                     |
+//+------------------------------------------------------------------+
+void newOrderManagement()
+  {
+
+   if(OrdersTotal()>499)
+     {
+
+      for(int i=0;i<50;i++)
+        {
+
+         bool a=OrderDelete(getFirstOrder(),clrNONE);
+        }
+     }
+   
+   int mcCounter =0;
+
+   for(int i=0;i<OrdersTotal();i++){
+   
+   selectOrder(i,p,trades);
+   if(OrderMagicNumber() == 1342)
+   {
+   mcCounter++;
+   }
+   
+   }
+   
+   while(mcCounter >inMCTraderMaxOrders && mcCounter >0){
+   
+    for(int i=0;i<OrdersTotal();i++){
+   
+   selectOrder(i,p,trades);
+   if(OrderMagicNumber() == 1342){
+   bool b = OrderDelete(OrderTicket(),clrNONE);
+   mcCounter--;
+   break;
+   }
+   }
+   
+   }
+   
+
+   if(openOrders!=getOpenOrders())
+     {
+
+      displayAverageOrderPrice=!displayAverageOrderPrice;
+      updateObjects();
+      updateStatus();
+      displayAverageOrderPrice=!displayAverageOrderPrice;
+      updateObjects();
+      updateStatus();
+
+     }
+
+   if(inGapCamper==1 && gapCamperTrading)
+     {
+
+      gapCamper();
+
+     }
+
+   if(inReverseCandleTrader==1)
+     {
+
+      reverseCandleTrader();
+
+     }
+
+   if(inGapCamper)
+     {
+
+      if(MarketInfo(Symbol(),MODE_TRADEALLOWED)==0 || TimeHour(TimeCurrent())<10)
+        {
+
+         gapCamperTrading=true;
+
+        }
+
+     }
+
+  
+
+   if(enableOCTO)
+     {
+
+      if(OrdersTotal()>0)
+        {
+
+         int ticket=0;
+         bool closeBuy=false;
+         bool closeSell=false;
+
+         for(int i=0; i<OrdersTotal();i++)
+           {
+
+            selectOrder(i,p,trades);
+
+            if(OrderType()==OP_BUY)
+              {
+
+               closeSell=true;
+               ticket=OrderTicket();
+
+              }
+
+            if(OrderType()==OP_SELL)
+              {
+
+               closeBuy=true;
+               ticket=OrderTicket();
+
+              }
+
+            if(closeBuy || closeSell)
+              {
+
+               for(int k=0; k<OrdersTotal();k++)
+                 {
+                  selectOrder(k,p,trades);
+
+                  if(closeBuy && OrderOpenPrice()-getOrderOpenPrice(ticket)<200)
+                     if(OrderType()==OP_BUYSTOP)
+                       {
+
+                        bool success=OrderDelete(OrderTicket());
+
+                       }
+                  if(closeSell)
+                    {
+                     if(OrderType()==OP_SELLSTOP && getOrderOpenPrice(ticket)-OrderOpenPrice()<200)
+                       {
+
+                        bool success=OrderDelete(OrderTicket());
+
+                       }
+                    }
+                 }
+              }
+
+           }
+        }
+
+     }
+
+   if(gapCamperHigh!=0 && gapCamperLow!=0 && gapCamperDelete)
+     {
+
+      int ticketTempHigh= 0;
+      int ticketTempLow = 0;
+
+      if(getOrderTicketByPrice(gapCamperHigh)!=-1)
+        {
+
+         ticketTempHigh= getOrderTicketByPrice(gapCamperHigh);
+         ticketTempLow = getOrderTicketByPrice(gapCamperLow);
+
+
+         selectOrder(ticketTempHigh,t,trades);
+
+         if(OrderType()==OP_BUY)
+           {
+
+            if(OrderMagicNumber()==1338)
+              {
+
+               bool b=OrderDelete(ticketTempLow,clrNONE);
+
+              }
+
+            if(OrderOpenPrice()-OrderStopLoss()<inStopLoss) //Stoploss nach Gap Sprung nachziehen
+              {
+
+               setStopLoss(OrderTicket(),OrderOpenPrice()-inStopLoss);
+
+              }
+            gapCamperDelete=false;
+
+           }
+
+        }
+
+      if(getOrderTicketByPrice(gapCamperLow)!=-1)
+        {
+
+         ticketTempHigh=getOrderTicketByPrice(gapCamperHigh);
+         ticketTempLow=getOrderTicketByPrice(gapCamperLow);
+
+         selectOrder(ticketTempLow,t,trades);
+
+         if(OrderType()==OP_SELL)
+           {
+
+            if(OrderMagicNumber()==1338)
+              {
+
+               bool c=OrderDelete(ticketTempHigh,clrNONE);
+
+              }
+
+            if(OrderOpenPrice()-OrderStopLoss()<inStopLoss) //Stoploss nach Gap Sprung nachziehen
+              {
+
+               setStopLoss(OrderTicket(),OrderOpenPrice()-inStopLoss);
+
+              }
+
+            gapCamperDelete=false;
+           }
+
+        }
+
+     }
+     
+   
+    
+     
+     
+      if(inLiveTest == 0){
+      
+         
+   string dayEnd=(string) Year()+"."+(string) Month()+"."+(string) Day()+". 21:59:00";
+   
+   string dayBegin=(string) Year()+"."+(string) Month()+"."+(string) Day()+". 08:00:05";
+
+
+   if(TimeCurrent()>StrToTime(dayEnd)) //Ende des Handelstages?
+   {
+   
+   for(int i=0;i<OrdersTotal();i++){
+   
+   selectOrder(i,p,trades);
+   
+   if(OrderType()==OP_BUYSTOP){
+   
+   addToBuyOrderCollection(OrderOpenPrice());
+   
+   }
+   
+   if(OrderType() == OP_SELLSTOP){
+   
+   addToSellOrderCollection(OrderOpenPrice());
+   
+   }
+   
+   
+   }
+   closeAllStopOrders();
+   
+   goodMorning = true;
+   
+   }
+   
+   if(TimeCurrent()>StrToTime(dayBegin) && goodMorning)  //Kurz nach Handeslbeginn
+ 
+ {
+   for(int i=0;i<499;i++){
+   
+   if(buyOrderCollection[i]!= -1){
+   
+   if(Ask>buyOrderCollection[i]){
+   
+   //Automatisches Lot Management bei Buy Orders  
+   openbuy(inStopLoss,inTakeProfit,magicTrend);  
+   buyOrderCollection[i]=-1;
+   
+     
+   Print("OPENBUY "+i);
+   
+   }
+   
+   else{
+   
+   buyStopOrder(buyOrderCollection[i],magicTrend);
+   buyOrderCollection[i] = -1;
+   
+   Print("BUYSTOP "+i);
+   
+   }
+   
+   }
+   
+   if(sellOrderCollection[i]!= -1){
+   
+   if(Bid<sellOrderCollection[i])
+   {
+   
+   //Automatisches Lot Management bei Sell Orders
+   opensell(inStopLoss,inTakeProfit,magicTrend);
+   sellOrderCollection[i]=-1;
+   
+   Print("OPENSELL "+i);
+   
+   }
+   
+   
+   else{
+   
+    sellStopOrder(sellOrderCollection[i],magicTrend);
+    sellOrderCollection[i] = -1;
+    Print("SELLSTOP "+i);
+    
+   }
+   }
+     
+   }
+   goodMorning = false;
+
+  }
+  
+  
+  
+  }
+  
+  }
+//+------------------------------------------------------------------+
+//|         Das Ticket der Order mit dem geg. Preis ausgeben         |
+//+------------------------------------------------------------------+
+int getOrderTicketByPrice(double price)
+  {
+
+   for(int i=0;i<OrdersTotal();i++)
+     {
+
+      selectOrder(i,p,trades);
+
+      if(OrderOpenPrice()==price)
+        {
+
+         return OrderTicket();
+
+        }
+
+     }
+
+   return -1;
+  }
+//+------------------------------------------------------------------+
+//|    Umkehrkerzen handeln                                          |
+//+------------------------------------------------------------------+
+void reverseCandleTrader()
+  {
+
+   if(getCandleStickToBodyRatio(1)>=inReverseCandleMinRatio)
+     {
+
+      if(distanceFromCandleBorder(1)<=inReverseCandleMaxDistToBorder)
+        {
+
+         if(reverseCandleDown)
+           {
+
+            if(getHigh(1)>getHigh(2))//Höher als Kerze zuvor?
+              {
+
+               if(!orderAlreadyOpened(getLow(1)-inSpreadDistance,magicReverseCandle))
+                 {
+
+                  sellStopOrder(getLow(1)-inSpreadDistance,magicReverseCandle);
+
+                 }
+              }
+
+           }
+
+         else
+           {
+
+            if(getLow(1)<getLow(2)) //Tiefer als Kerze zuvor?
+              {
+
+               if(!orderAlreadyOpened(getHigh(1)+inSpreadDistance,magicReverseCandle))
+                 {
+
+                  buyStopOrder(getHigh(1)+inSpreadDistance,magicReverseCandle);
+
+                 }
+
+              }
+           }
+
+        }
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|       Abstand des Schlusskurses von Hoch/Tief der Kerze ausgeben |
+//+------------------------------------------------------------------+
+double distanceFromCandleBorder(int n)
+  {
+
+   double high=getHigh(n);
+
+   double low=getLow(n);
+
+   double open=getOpen(n);
+
+   double close=getClose(n);
+
+   double min=close-low;
+
+   reverseCandleDown=true;
+
+   if(high-close<min)
+     {
+
+      min=high-close;
+
+      reverseCandleDown=false;
+
+     }
+
+   return min;
+
+  }
+//+------------------------------------------------------------------+
+//|    Das Verhältnis von Kerzen Doch zu Körper ausgeben             |
+//+------------------------------------------------------------------+
+double getCandleStickToBodyRatio(int n)
+  {
+
+   double bodySize=0;
+
+   double stickSize=0;
+
+   double ratio=0;
+
+   double high=getHigh(n);
+
+   double low=getLow(n);
+
+   double open=getOpen(n);
+
+   double close=getClose(n);
+
+   bodySize=open-close;
+
+   if(bodySize<0)
+     {
+
+      bodySize=-bodySize;
+
+     }
+
+   stickSize=high-low;
+
+   if(stickSize<0)
+     {
+
+      stickSize=-stickSize;
+
+     }
+
+   if(stickSize==0 || bodySize==0)
+     {
+
+      return 0;
+
+     }
+
+   ratio=stickSize/bodySize;
+
+   return ratio;
+
+  }
+//+------------------------------------------------------------------+
+//|  Gibt den Eröffnungspreis einer Order zurück                     |
+//+------------------------------------------------------------------+
+double getOrderOpenPrice(int ticket)
+  {
+
+   selectOrder(ticket,t,trades);
+   return OrderOpenPrice();
+
+  }
+//+------------------------------------------------------------------+
+//|   Überprüft ob die Gewinne sicher sind(bei Benutzung von SL Alg.)|
+//+------------------------------------------------------------------+
+bool profitsLockedIn()
+  {
+
+   for(int i=0;i<OrdersTotal();i++)
+     {
+
+      selectOrder(i,p,trades);
+
+      double limit=averageOrderPrice;
+
+      if(OrderType()==OP_BUY)
+        {
+
+         if(getLow(ASS+1)>limit) //Minimaler Stoploss ist kleiner als Profitgrenze
+           {
+
+            return true;
+            break;
+
+           }
+
+        }
+
+      if(OrderType()==OP_SELL)
+        {
+
+         if(getHigh(ASS+1)<limit) //Minimaler Stoploss ist größer als Profitgrenze
+           {
+
+            return true;
+            break;
+
+           }
+
+        }
+
+     }
+
+   return false;
+
+  }
+//+------------------------------------------------------------------+
+//|  Übergebene Zahl Runden, auf übergebene Anzahl von Stellen       |
+//+------------------------------------------------------------------+
+double RoundNumber(double number,int digits) 
+  {
+   number=MathRound(number*MathPow(10,digits));
+   return (number * MathPow(10, -digits));
+  }
+//+------------------------------------------------------------------+
+//|     Verwaltung von lots                                          |
+//+------------------------------------------------------------------+
+void lotManagement()
+  {
+
+   if(inLotsIncrease==1)
+     {
+
+      if(inLiveTest==1)
+        {
+
+         double tempBalance=balance -(inStartingBalance-1000);
+         totalLots=RoundNumber(tempBalance/1000,1);
+
+        }
+      else
+        {
+         totalLots=RoundNumber(AccountBalance()/1000,1);
+  
+        }
+
+      if(totalLots<0.1)
+        {
+
+         totalLots=0.1;
+
+        }
+
+      for(int i=0; i<ArraySize(lotStorage)-1;i++)
+        {
+
+         lotStorage[i]=0;
+
+        }
+
+      for(int i=0; i<ArraySize(lotStorage)-1;i++)
+        {
+
+         if(totalLots>100)
+           {
+
+            lotStorage[i]=100;
+            totalLots-=100;
+           }
+
+         else
+           {
+            lotStorage[i]=totalLots;
+
+            break;
+           }
+
+        }
+
+      for(int i=0;i<OrdersTotal();i++)
+        {
+
+         selectOrder(i,p,trades);
+
+         double lotsTotalTemp=0;
+
+         for(int k=0;k<ArraySize(lotStorage)-1;k++)
+           {
+
+            if(lotStorage[k]!=0)
+              {
+
+               lotsTotalTemp+=lotStorage[k];
+
+              }
+
+           }
+
+        }
+
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|    Kerzen gleicher Farbe in Folge handeln                        |
+//+------------------------------------------------------------------+
+void multipleCandleTrader()
+  {
+
+   bool green=true;
+
+   bool red=true;
+
+   for(int i=1;i<=inConsiderNCandles;i++)
+     {
+
+      if(candleColor(i)!=1)
+        {
+
+         green=false;
+
+        }
+
+      if(candleColor(i)!=-1)
+        {
+
+         red=false;
+
+        }
+
+     }
+
+
+   if(green && getCandleBodySize(1)>inDTMinCandleSize)
+     {
+
+
+      if(!orderAlreadyOpened(getHigh(1)+inMCSpreadDistance,magicMultipleCandle))
+        {
+
+         double price=getHigh(1);
+         int tries=10; //10 Versuche Order aufzugeben
+
+         while(!buyStopOrder(price+inMCSpreadDistance,magicMultipleCandle) && tries>0)
+           {
+
+            price++;
+            tries--;
+
+           }
+
+
+        }
+
+     }
+
+   if(red && getCandleBodySize(1)>inDTMinCandleSize)
+     {
+
+      if(!orderAlreadyOpened(getLow(1)-inMCSpreadDistance,magicMultipleCandle))
+        {
+
+         double price=getLow(1);
+         int tries=10; //10 Versuche Order aufzugeben
+
+         while(!sellStopOrder(price-inMCSpreadDistance,magicMultipleCandle) && tries>0)
+           {
+
+            price--;
+            tries--;
+
+           }
+
+        }
+
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|     Am Ende des Tradingtages eine Order über und unterhalb des   |
+//|         letzten Hoch/Tief Punktes setzen                         |
+//+------------------------------------------------------------------+
+void gapCamper()
+  {
+   string date=(string) Year()+"."+(string) Month()+"."+(string) Day()+". 22:59:00";
+
+   datetime lastBarTime=StrToTime(date);
+
+//count bars abhängig von Period if period = m15 last bar distance = ... 
+//if(bar(mit 8:00) = last bar distance, place order
+
+   if(TimeCurrent()>lastBarTime)
+     {
+
+      gapCamperTrading=false;
+
+      if(!orderAlreadyOpened(getHigh(0)+inGapCamperDistance,magicGapCamp) && noOrderNear(getHigh(0)+inGapCamperDistance,10,magicGapCamp))
+        {
+
+         gapCamperHigh=(double) getHigh(0)+inGapCamperDistance;
+         buyStopOrder(getHigh(0)+inGapCamperDistance,magicGapCamp);
+         gapCamperDelete=true;
+
+        }
+
+      if(!orderAlreadyOpened(getLow(0)-inGapCamperDistance,magicGapCamp) && noOrderNear(getLow(0)-inGapCamperDistance,10,magicGapCamp))
+        {
+
+         gapCamperLow=(double) getLow(0)-inGapCamperDistance;
+         sellStopOrder(getLow(0)-inGapCamperDistance,magicGapCamp);
+         gapCamperDelete=true;
+        }
+
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|  Die gesamte Anzahl von Lots zu einem gegebenen Preis ausgeben   |
+//+------------------------------------------------------------------+
+double getTotalOrderLots(double price)
+  {
+
+   double l=0;
+
+   for(int i=0;i<OrdersTotal();i++)
+     {
+
+      selectOrder(i,p,trades);
+
+      if(OrderOpenPrice()==price)
+        {
+
+         l+=OrderLots();
+
+        }
+
+     }
+
+   return l;
+
+  }
+//+------------------------------------------------------------------+
+//|      Bei Schluss nahe an Grenze des Außenstabs traden            |
+//+------------------------------------------------------------------+
+void aussenstabTrading()
+  {
+
+   if(inAussenstab() && enableAussenstabOrder)
+     {
+
+      if(getCandleBodySize(ASS)>inAussenStabMinSize)
+        {
+
+         if(candleColor(2)==1 && candleColor(1)==-1)
+           {
+
+            if(!orderAlreadyOpened(getClose(1),magicAussenstab))
+              {
+               opensell(inStopLoss,inTakeProfit,magicAussenstab);
+               enableAussenstabOrder=false;
+
+              }
+           }
+         if(candleColor(2)==-1 && candleColor(1)==1)
+           {
+
+            if(!orderAlreadyOpened(getClose(1),magicAussenstab))
+              {
+               openbuy(inStopLoss,inTakeProfit,magicAussenstab);
+               enableAussenstabOrder=false;
+
+              }
+           }
+
+        }
+
+     }
+
+   if(!inAussenstab())
+     {
+
+      enableAussenstabOrder=true;
+
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|     Aktionen beim Wechsel der Zeiteinheit                        |
+//+------------------------------------------------------------------+
+void timeFrameManagement()
+  {
+
+   if(currentTimeFrame!=PERIOD_CURRENT)
+     {
+
+      offset=0;  //Offset von Chart Elementen zurücksetzen
+
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|     Ton Verwaltung                                               |
+//+------------------------------------------------------------------+
+void soundManagement()
+  {
+
+   if(enableAFKSoundMode)
+     {
+
+      if(inAussenstab())
+        {
+
+         toggleSound1=true;
+
+         if(toggleSound1 && !toggleSound2)
+           {
+
+            PlaySound("closeInOutsideBar.wav");     //Closed in outside Bar
+
+            toggleSound2=true;
+
+           }
+
+        }
+
+      if(!inAussenstab())
+        {
+
+         if(toggleSound1 && toggleSound2) //war in Außenstab, jetzt ausgebrochen
+           {
+
+            int ticket=getOrderWithHighestProfit();
+
+            if(ticket==-1) //keine offene Order?
+              {
+
+               if(iClose(Symbol(),PERIOD_CURRENT,1)>iClose(Symbol(),PERIOD_CURRENT,2))
+
+                 {
+                  PlaySound("positiveOutsideBarBreakoutTop.wav");      //Ausbruch nach oben
+                 }
+
+               if(iClose(Symbol(),PERIOD_CURRENT,1)<iClose(Symbol(),PERIOD_CURRENT,2))
+                 {
+
+                  PlaySound("positiveOutsideBarBreakoutBottom.wav");     //Ausbruch nach unten 
+                 }
+              }
+
+            else
+              {
+
+               selectOrder(ticket,t,trades);
+
+               if(iClose(Symbol(),PERIOD_CURRENT,1)>iClose(Symbol(),PERIOD_CURRENT,2))
+
+                 {
+
+                  if(OrderType()==OP_SELL)
+                    {
+
+                     PlaySound("negativeOutsideBarBreakoutTop.wav");
+
+                    }
+
+                  if(OrderType()==OP_BUY)
+                    {
+
+                     PlaySound("positiveOutsideBarBreakoutTop.wav");      //Ausbruch nach oben gut bei Buy Order
+                    }
+
+                 }
+
+               if(iClose(Symbol(),PERIOD_CURRENT,1)<iClose(Symbol(),PERIOD_CURRENT,2))
+                 {
+
+                  if(OrderType()==OP_BUY)
+                    {
+
+                     PlaySound("negativeOutsideBarBreakoutBottom.wav");      //Ausbruch nach unten schlecht bei Buy Order
+                    }
+
+                  else
+                    {     //Sell Order
+
+                     PlaySound("positiveOutsideBarBreakoutBottom.wav");     //Ausbruch nach unten gut bei Sell Order
+
+                    }
+
+                 }
+
+              }
+
+            toggleSound2=false;
+
+           }
+
+        }
+
+      if(openOrders!=OrdersTotal())
+        {
+
+         if(openOrders>getOpenOrders()) //Order wurde geschlossen
+           {
+            selectOrder(OrdersHistoryTotal()-1,p,history);   //erste geschlossene Order auswählen
+
+            if(OrderProfit()<0) //Stoploss hat gegriffen?
+              {
+
+               if(OrderType()==OP_SELL)
+                 {
+                  PlaySound("sellOrderStopLossActivated.wav");
+                  Sleep(1000);
+                 }
+               if(OrderType()==OP_BUY)
+                 {
+                  PlaySound("buyOrderStopLossActivated.wav");
+                  Sleep(1000);
+                 }
+              }
+
+            if(OrderProfit()>=0)
+              {
+
+               if(OrderType()==OP_SELL)
+                 {
+                  PlaySound("sellOrderTakeProfitSuccessful.wav");
+                  Sleep(1000);
+                 }
+               if(OrderType()==OP_BUY)
+                 {
+                  PlaySound("buyOrderTakeProfitSuccessful.wav");
+                  Sleep(1000);
+                 }
+
+              }
+
+           }
+
+         if(openOrders<getOpenOrders()) //Order wurde eröffnet
+
+           {
+
+            selectOrder(OrdersTotal()-1,p,trades);
+
+            if(OrderType()==OP_SELL)
+              {
+               PlaySound("sellOrderOpened.wav");
+               Sleep(1000);
+              }
+            if(OrderType()==OP_BUY)
+              {
+               PlaySound("buyOrderOpened.wav");
+               Sleep(1000);
+              }
+            if(OrderType()==OP_SELLSTOP && OrderProfit()<10000)
+              {
+               PlaySound("sellOrderOpened.wav");
+               Sleep(1000);
+              }
+            if(OrderType()==OP_BUYSTOP && OrderProfit()<10000)
+              {
+               PlaySound("buyOrderOpened.wav");
+               Sleep(1000);
+              }
+
+           }
+
+         openOrders=getOpenOrders();
+        }
+
+     }
+  }
+//+------------------------------------------------------------------+
+//|   Text auf dem Bildschirm updaten                                |
+//+------------------------------------------------------------------+
+void updateText()
+  {
+
+   if(inLiveTest==0)
+     {
+
+      if(!notCreated("GewinnInProzentAnzeigen")) //nicht nicht bereits kreiert -> bereits kreiert
+        {
+         ObjectSetString(ChartID(),"GewinnInProzentAnzeigen",OBJPROP_TEXT,"Tagesgewinn: "+(string) getProfitOfToday()+"€ | "+(string) getTotalProfitPercentageOfToday()+"% || aktueller Trade: "+(string) getProfitPercentageOfBalance()+"%");
+
+        }
+     }
+
+   if(inLiveTest==1)
+     {
+
+      if(!notCreated("GesamtGewinnAnzeigen")) //nicht nicht bereits kreiert -> bereits kreiert
+        {
+         double totalWin=RoundNumber(AccountBalance()-inStartingBalance,1);
+         ObjectSetString(ChartID(),"GesamtGewinnAnzeigen",OBJPROP_TEXT,"Gesamtgewinn: "+(string) totalWin + " | Heute: "+ (string) +getProfitOfToday());
+
+        }
+
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|     eröffnete Positionen ausgeben                                |
+//+------------------------------------------------------------------+
+int getOpenOrders()
+  {
+
+   int counter=0;
+
+   for(int i=0; i<OrdersTotal();i++)
+     {
+
+      selectOrder(i,p,trades);
+
+      if(OrderType()==OP_BUY || OrderType()==OP_SELL)
+        {
+
+         counter++;
+
+        }
+      if(OrderType()==OP_BUYSTOP && OrderProfit()!=0)
+        {
+
+         counter++;
+
+        }
+
+      if(OrderType()==OP_SELLSTOP && OrderProfit()!=0)
+        {
+
+         counter++;
+
+        }
+
+     }
+
+   return counter;
+
+  }
+//+------------------------------------------------------------------+
+//|     Die Order mit dem Höchsten Profit ausgeben                   |
+//+------------------------------------------------------------------+
+int getOrderWithHighestProfit()
+  {
+
+   double profit=-1000000;
+   int ticket=-1;
+
+   for(int i=0; i<getOpenOrders();i++)
+     {
+
+      selectOrder(i,p,trades);
+
+      if(OrderProfit()>profit)
+        {
+
+         profit=OrderProfit();
+         ticket= OrderTicket();
+        }
+
+     }
+
+   return ticket;
+
+  }
+//+------------------------------------------------------------------+
+//|     Tages Profit in Euro anzeigen                                |
+//+------------------------------------------------------------------+
+double getProfitOfToday()
+  {
+
+   double profit=AccountBalance()-getAccountBalanceFromLastDay();
+
+   profit=profit;
+
+   profit=MathRound(profit);
+
+   return profit;
+
+  }
+//+------------------------------------------------------------------+
+//|   Namen von Text Objekten in Array speichern                     |
+//+------------------------------------------------------------------+
+void saveToTextObjectArray(string str)
+  {
+
+   int counter=0;
+
+   while(textObjects[counter]!="-1" && counter<99) //Das erste freie Feld finden
+     {
+      counter++;
+     }
+
+   textObjects[counter]=str;
+
+   counter=0;
+
+  }
+//+------------------------------------------------------------------+
+//|    Text Objekt aus Array entfernen und diesen dann sortieren     |
+//+------------------------------------------------------------------+
+void removeFromTextObjectArray(string str)
+  {
+
+   int counter=0;
+
+   while(textObjects[counter]!=str && counter<99) //Den gesuchten String finden
+     {
+      counter++;
+     }
+
+   if(counter<99)
+     {
+      textObjects[counter]="-1";
+     }
+
+   else
+     {
+
+      Alert("Fehler beim Entfernen von Objekt ",str);
+
+     }
+
+   counter=0;
+
+//Array sortieren
+
+   for(int i=0; i<98; i++)
+     {
+
+      string temp="";
+
+      if(textObjects[i]=="-1" && textObjects[i+1]!="-1")
+        {
+
+         temp=textObjects[i+1];
+         textObjects[i]=temp;
+         textObjects[i+1]="-1";
+
+        }
+
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|           Status von Chartobjekten updaten                       |
+//+------------------------------------------------------------------+
+void updateStatus()
+  {
+
+   bool objectCreateSuccess;
+
+   static bool offsetEnabled=false;
+
+   if(toggleHelp) //Hilfe anzeigen
+
+     {
+
+      offsetEnabled=true;
+
+      //28. Zeile Hilfe
+
+      string name="hilfe28";
+
+      if(notCreated(name))
+        {
+
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+         setObjectText(name,"[Z] - Takeprofit--");
+         helpEntries++;
+        }
+
+      //27. Zeile Hilfe
+
+      name="hilfe27";
+
+      if(notCreated(name))
+        {
+
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+         setObjectText(name,"[V] - Alle Stoploss löschen");
+         helpEntries++;
+        }
+
+      //26. Zeile Hilfe
+
+      name="hilfe26";
+
+      if(notCreated(name))
+        {
+
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+         setObjectText(name,"[U] - Takeprofit ++");
+         helpEntries++;
+        }
+
+      //25. Zeile Hilfe
+
+      name="hilfe25";
+
+      if(notCreated(name))
+        {
+
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+         setObjectText(name,"[R] - Takeprofit auf Durchschnittspreis -> [P]");
+         helpEntries++;
+        }
+
+      //24. Zeile Hilfe
+
+      name="hilfe24";
+
+      if(notCreated(name))
+        {
+
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+         setObjectText(name,"[Q] - Stoploss auf Durchschnittspreis ->[P]");
+         helpEntries++;
+        }
+
+      //23. Zeile Hilfe
+
+      name="hilfe23";
+
+      if(notCreated(name))
+        {
+
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+         setObjectText(name,"[N] - Trailing Stoploss aktivieren / verändern");
+         helpEntries++;
+        }
+
+      //22. Zeile Hilfe
+
+      name="hilfe22";
+
+      if(notCreated(name))
+        {
+
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+         setObjectText(name,"[J] - Alle Takeprofits löschen");
+         helpEntries++;
+        }
+
+      //21. Zeile Hilfe
+
+      name="hilfe21";
+
+      if(notCreated(name))
+        {
+
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+         setObjectText(name,"[E] - One Cancels The Other Modus aktivieren");
+         helpEntries++;
+        }
+
+      //20. Zeile Hilfe
+
+      name="hilfe20";
+
+      if(notCreated(name))
+        {
+
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+         setObjectText(name,"[G] - offene Gaps anzeigen");
+         helpEntries++;
+        }
+
+      //19. Zeile Hilfe
+
+      name="hilfe19";
+
+      if(notCreated(name))
+        {
+
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+         setObjectText(name,"[P] - Durchschnittlichen Order Preis anzeigen");
+         helpEntries++;
+        }
+
+      //18. Zeile Hilfe
+
+      name="hilfe18";
+
+      if(notCreated(name))
+        {
+
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+         setObjectText(name,"[Y] - Stoploss bei allen Orders +1");
+         helpEntries++;
+        }
+      //17. Zeile Hilfe
+
+      name="hilfe17";
+
+      if(notCreated(name))
+        {
+
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+         setObjectText(name,"[X] - Stoploss bei allen Orders -1");
+         helpEntries++;
+        }
+
+      //16. Zeile Hilfe
+
+      name="hilfe16";
+
+      if(notCreated(name))
+        {
+
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+         setObjectText(name,"[C] - Alle offenen Orders schließen");
+         helpEntries++;
+        }
+
+      //15. Zeile Hilfe
+
+      name="hilfe15";
+
+      if(notCreated(name))
+        {
+
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+         setObjectText(name,"[F] - Tagesgewinn anzeigen");
+         helpEntries++;
+        }
+
+      //14. Zeile Hilfe
+
+      name="hilfe14";
+
+      if(notCreated(name))
+        {
+
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+         setObjectText(name,"[A] - AFK Sound Modus aktivieren");
+         helpEntries++;
+        }
+
+      //13. Zeile Hilfe
+
+      name="hilfe13";
+
+      if(notCreated(name))
+        {
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+         setObjectText(name,"[Shift] - Fast Mode BUY/SELL");
+         helpEntries++;
+        }
+
+      //12. Zeile Hilfe
+
+      name="hilfe12";
+
+      if(notCreated(name))
+        {
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+         setObjectText(name,"[K] - Shortcuts aktivieren/deaktivieren");
+         helpEntries++;
+        }
+
+      //11. Zeile Hilfe
+
+      name="hilfe11";
+
+      if(notCreated(name))
+        {
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+         setObjectText(name,"[M] - Monatshoch/tief");
+         helpEntries++;
+        }
+
+      //10. Zeile Hilfe
+
+      name="hilfe10";
+
+      if(notCreated(name))
+        {
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+         setObjectText(name,"[W] - Wochenhoch/tief");
+         helpEntries++;
+        }
+
+      //9. Zeile Hilfe
+
+      name="hilfe9";
+
+      if(notCreated(name))
+        {
+         saveToTextObjectArray(name);
+
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+         setObjectText(name,"[D] - Tageshoch/tief");
+         helpEntries++;
+        }
+
+      //8. Zeile Hilfe
+
+      name="hilfe8";
+
+      if(notCreated(name))
+        {
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+         setObjectText(name,"[4] - 4 Stundenhoch/tief");
+         helpEntries++;
+        }
+
+      //7. Zeile Hilfe
+
+      name="hilfe7";
+
+      if(notCreated(name))
+        {
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+         setObjectText(name,"[1] - Stundenhoch/tief");
+         helpEntries++;
+        }
+
+      //6. Zeile Hilfe
+
+      name="hilfe6";
+
+      if(notCreated(name))
+        {
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+         setObjectText(name,"[I] - Aussenstabgrenzen");
+         helpEntries++;
+        }
+
+      //5. Zeile Hilfe
+
+      name="hilfe5";
+
+      if(notCreated(name))
+        {
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+         setObjectText(name,"[O] - Widerstände und Unterstützung anzeigen");
+         helpEntries++;
+        }
+
+      //4. Zeile Hilfe
+
+      name="hilfe4";
+
+      if(notCreated(name))
+        {
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+         setObjectText(name,"[L] - von Tradebot gehandelte Lots anzeigen und verändern");
+         helpEntries++;
+        }
+
+      //3. Zeile Hilfe
+
+      name="hilfe3";
+
+      if(notCreated(name))
+        {
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+         setObjectText(name,"[B] - Buystop Order im Abstand von 100P. zum aktuellen Kurs");
+         helpEntries++;
+        }
+
+      //2. Zeile Hilfe
+
+      name="hilfe2";
+
+      if(notCreated(name))
+        {
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+         setObjectText(name,"[S] - Sellstop Order im Abstand von 100P. zum aktuellen Kurs");
+         helpEntries++;
+        }
+
+      //1. Zeile Hilfe
+
+      name="hilfe1";
+
+      if(notCreated(name))
+        {
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+         setObjectText(name,"FUNKTIONEN: ");
+
+         helpEntries++;
+
+         sortTextObjectsOnScreen();   //Nach letztem Element sortieren!
+
+        }
+
+     }
+
+   if(!toggleHelp)
+     {
+
+      for(int h=1; h<helpEntries+1;h++)
+        {
+
+         string str="hilfe"+(string) h;
+
+         if(!notCreated(str)) //nicht nicht kreiert -> = aktuell vorhanden?
+           {
+
+            ObjectDelete(ChartID(),str);
+            removeFromTextObjectArray(str);
+
+           }
+        }
+      sortTextObjectsOnScreen();   //Nach letztem Element sortieren!
+
+      helpEntries=0;
+
+     }
+
+   if(displayWinPercentage)
+     {
+
+      if(inLiveTest==0)
+        {
+         offsetEnabled=true;
+
+         string name="GewinnInProzentAnzeigen";
+
+         if(notCreated(name))
+           {
+            objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+            checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+            ObjectSet(name, OBJPROP_CORNER, 3);    // Reference corner
+            ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+            ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+            ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+            setObjectColor(name,clrWhite);
+
+            setObjectText(name,"Gewinn in Prozent: "+(string) getProfitPercentageOfBalance()+"%");
+
+           }
+
+        }
+
+
+      else
+        {
+
+         offsetEnabled=true;
+
+         string name="GesamtGewinnAnzeigen";
+
+         if(notCreated(name))
+           {
+            objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+            checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+            ObjectSet(name, OBJPROP_CORNER, 3);    // Reference corner
+            ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+            ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+            ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+            setObjectColor(name,clrWhite);
+            double totalWin=RoundNumber(balance-inStartingBalance,1);
+            setObjectText(name,"Gesamtgewinn: "+(string) totalWin + " | Heute: "+ (string) +getProfitOfToday());
+
+           }
+
+        }
+
+     }
+
+
+
+   if(!displayWinPercentage)
+     {
+
+      if(inLiveTest==0)
+        {
+
+         if(!notCreated("GewinnInProzentAnzeigen"))
+           {
+
+            ObjectDelete(ChartID(),"GewinnInProzentAnzeigen");
+           }
+
+        }
+
+      else
+        {
+
+         if(!notCreated("GesamtGewinnAnzeigen"))
+           {
+
+            ObjectDelete(ChartID(),"GesamtGewinnAnzeigen");
+           }
+
+        }
+
+     }
+
+   if(displayLots)
+     {
+      offsetEnabled=true;
+
+      string name="lotsAnzeigen";
+
+      if(notCreated(name))
+        {
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+
+         setObjectText(name,"gehandelte Lots: "+(string) NormalizeDouble(inLots+manualLots,1)+" ||  [1]+ | [2] ++  |  [3] - | [4]--");
+
+         sortTextObjectsOnScreen();
+
+        }
+
+     }
+
+   if(!displayLots)
+     {
+
+      if(!notCreated("lotsAnzeigen"))
+        {
+
+         ObjectDelete(ChartID(),"lotsAnzeigen");
+         removeFromTextObjectArray("lotsAnzeigen");
+         sortTextObjectsOnScreen();
+        }
+
+     }
+   if(manualTrailing)
+     {
+
+      string averageModeStatus="[SHIFT] -> AVG MODE";
+
+      if(enableAverageStopLossMode)
+        {
+
+         averageModeStatus="AVG aktiv [SHIFT]";
+
+        }
+
+      offsetEnabled=true;
+
+      string name="trailingStop";
+
+      if(notCreated(name))
+        {
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name,OBJPROP_CORNER,2);    // Reference corner
+         ObjectSet(name,OBJPROP_XDISTANCE,(double) chartWidth/2);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrRed);
+
+         setObjectText(name,"Trailing Stop[N] | Abstand: "+(string)(inTrailingDistance+manualTrailingDistance)+" | [8]+ [9]- | "+averageModeStatus);
+
+         sortTextObjectsOnScreen();
+        }
+
+     }
+
+   if(!manualTrailing)
+     {
+
+      if(!notCreated("trailingStop"))
+        {
+
+         ObjectDelete(ChartID(),"trailingStop");
+         removeFromTextObjectArray("trailingStop");
+         sortTextObjectsOnScreen();
+        }
+
+     }
+
+   if(enableOCTO)
+     {
+      offsetEnabled=true;
+
+      string name="octoMode";
+
+      if(notCreated(name))
+        {
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name,OBJPROP_CORNER,2);    // Reference corner
+         ObjectSet(name,OBJPROP_XDISTANCE,(double) chartWidth/2);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrRed);
+
+         setObjectText(name,"OCTO MODE AKTIVIERT [E]");
+
+         sortTextObjectsOnScreen();
+        }
+
+     }
+
+   if(!enableOCTO)
+     {
+
+      if(!notCreated("octoMode"))
+        {
+
+         ObjectDelete(ChartID(),"octoMode");
+         removeFromTextObjectArray("octoMode");
+         sortTextObjectsOnScreen();
+        }
+
+     }
+
+   if(enableAFKSoundMode)
+     {
+      offsetEnabled=true;
+
+      string name="AFKSoundMode";
+
+      if(notCreated(name))
+        {
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name,OBJPROP_CORNER,2);    // Reference corner
+         ObjectSet(name,OBJPROP_XDISTANCE,(double) chartWidth/2);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrRed);
+
+         setObjectText(name,"AFK SOUND MODE AKTIVIERT [A]");
+
+         sortTextObjectsOnScreen();
+        }
+
+     }
+
+   if(!enableAFKSoundMode)
+     {
+
+      if(!notCreated("AFKSoundMode"))
+        {
+
+         ObjectDelete(ChartID(),"AFKSoundMode");
+         removeFromTextObjectArray("AFKSoundMode");
+         sortTextObjectsOnScreen();
+        }
+
+     }
+
+   if(shortCutsDeactivated)
+     {
+      offsetEnabled=true;
+
+      string name="shortcuts deaktiviert";
+
+      if(notCreated(name))
+        {
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,false); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+         setObjectText(name,"SHORTCUTS DEAKTIVERT! [K] -> aktivieren");
+
+         sortTextObjectsOnScreen();
+        }
+
+     }
+
+   if(!shortCutsDeactivated)
+     {
+
+      if(!notCreated("shortcuts deaktiviert"))
+        {
+
+         ObjectDelete(ChartID(),"shortcuts deaktiviert");
+         removeFromTextObjectArray("shortcuts deaktiviert");
+         sortTextObjectsOnScreen();
+        }
+
+     }
+
+   if(toggleAussenstabLines)
+     {
+      offsetEnabled=true;
+
+      string name="Aussenstab Anzeige";
+
+      if(notCreated(name))
+        {
+         saveToTextObjectArray(name);
+         objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_LABEL,0,WindowFirstVisibleBar(),WindowPriceMin());
+
+         checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt?
+
+         ObjectSet(name, OBJPROP_CORNER, 2);    // Reference corner
+         ObjectSet(name, OBJPROP_XDISTANCE, 10);// X coordinate
+         ObjectSet(name,OBJPROP_YDISTANCE,10);// Y coordinate
+         ObjectSetInteger(ChartID(),name,OBJPROP_BACK,true); //in den Vordergrund
+         setObjectColor(name,clrWhite);
+         setObjectText(name,"Aussenstab Anzeige aktiviert [I]");
+
+         sortTextObjectsOnScreen();
+        }
+
+     }
+
+   if(!toggleAussenstabLines)
+     {
+
+      if(!notCreated("Aussenstab Anzeige"))
+        {
+
+         ObjectDelete(ChartID(),"Aussenstab Anzeige");
+         removeFromTextObjectArray("Aussenstab Anzeige");
+         sortTextObjectsOnScreen();
+        }
+
+     }
+
+   if(!offsetEnabled)
+     {
+
+      offset=0;
+
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|         Kerze beschriften                                        |
+//+------------------------------------------------------------------+
+void labelCandle(int candle,string text,bool textAboveCandle)
+  {
+
+//TODO
+
+  }
+//+------------------------------------------------------------------+
+//|     Aufwärts Trend aktiv?                                        |
+//+------------------------------------------------------------------+
+bool isTrendUp(int beginCandle)
+  {
+
+   if(inUseCandleClose==1)
+     {
+
+      korrekturUp=false;
+      int n=beginCandle;
+
+      if(getClose(n+1)>=getClose(n)+20*Point)
+        {
+
+         korrekturUp=true;
+
+         trendMax2=getClose(getFirstMax(n));
+         n=getFirstMax(n);
+
+         trendMin2=getClose(getFirstMin(n));
+         n=getFirstMin(n);
+
+         if(trendMin2<getClose(beginCandle))
+           {
+
+            return false;
+
+           }
+
+         trendMax1=getClose(getFirstMax(n));
+         n=getFirstMax(n);
+
+         if(trendMax1>=trendMax2)
+           {
+
+            return false;
+
+           }
+
+         trendMin1=getClose(getFirstMin(n));
+         n=getFirstMin(n);
+
+         if(trendMin1>=trendMin2)
+           {
+
+            return false;
+
+           }
+
+         return true;
+
+
+        }
+
+      else
+        {
+
+         korrekturUp=false;
+
+         trendMin2=getClose(getFirstMin(n));
+         n=getFirstMin(n);
+
+         trendMax2=getClose(getFirstMax(n));
+         n=getFirstMax(n);
+
+         trendMin1=getClose(getFirstMin(n));
+         n=getFirstMin(n);
+
+         if(trendMin1>=trendMin2)
+           {
+
+            return false;
+
+           }
+
+         trendMax1=getClose(getFirstMax(n));
+         n=getFirstMax(n);
+
+         if(trendMax1>=trendMax2)
+           {
+
+            return false;
+
+           }
+
+         return true;
+
+
+
+        }
+     }
+
+   else
+     {
+
+      korrekturUp=false;
+      int n=beginCandle;
+
+      if(getHigh(n+1)>=getHigh(n)+20*Point)
+        {
+
+         korrekturUp=true;
+
+         trendMax2=getHigh(getFirstMax(n));
+         n=getFirstMax(n);
+
+         trendMin2=getLow(getFirstMin(n));
+         n=getFirstMin(n);
+
+         if(trendMin2<getLow(beginCandle))
+           {
+
+            return false;
+
+           }
+
+         trendMax1=getHigh(getFirstMax(n));
+         n=getFirstMax(n);
+
+         if(trendMax1>=trendMax2)
+           {
+
+            return false;
+
+           }
+
+         trendMin1=getLow(getFirstMin(n));
+         n=getFirstMin(n);
+
+         if(trendMin1>=trendMin2)
+           {
+
+            return false;
+
+           }
+
+         return true;
+
+
+        }
+
+      else
+        {
+
+         korrekturUp=false;
+
+         trendMin2=getLow(getFirstMin(n));
+         n=getFirstMin(n);
+
+         trendMax2=getHigh(getFirstMax(n));
+         n=getFirstMax(n);
+
+         trendMin1=getLow(getFirstMin(n));
+         n=getFirstMin(n);
+
+         if(trendMin1>=trendMin2)
+           {
+
+            return false;
+
+           }
+
+         trendMax1=getHigh(getFirstMax(n));
+         n=getFirstMax(n);
+
+         if(trendMax1>=trendMax2)
+           {
+
+            return false;
+
+           }
+
+         return true;
+
+
+
+        }
+
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|    Abwärts Trend aktiv?                                          |
+//+------------------------------------------------------------------+
+bool isTrendDown(int beginCandle)
+  {
+
+   if(inUseCandleClose==1)
+     {
+
+      korrekturDown=false;
+      int n=beginCandle;
+
+      if(getClose(n)>=getClose(n+1)+20*Point)
+        {
+
+         korrekturDown=true;
+
+         trendMin2=getClose(getFirstMin(n));
+         n=getFirstMin(n);
+
+         trendMax2=getClose(getFirstMax(n));
+         n=getFirstMax(n);
+
+         if(trendMax2<=getClose(beginCandle))
+           {
+
+            return false;
+
+           }
+
+         trendMin1=getClose(getFirstMin(n));
+         n=getFirstMin(n);
+
+         if(trendMin1<=trendMin2)
+           {
+
+            return false;
+
+           }
+
+         trendMax1=getClose(getFirstMax(n));
+         n=getFirstMax(n);
+
+         if(trendMax1<=trendMax2)
+           {
+
+            return false;
+
+           }
+
+         return true;
+
+
+        }
+
+      else
+        {
+
+         korrekturDown=false;
+
+         trendMax2=getClose(getFirstMax(n));
+         n=getFirstMax(n);
+
+         trendMin2=getClose(getFirstMin(n));
+         n=getFirstMin(n);
+
+         trendMax1=getClose(getFirstMax(n));
+         n=getFirstMax(n);
+
+         if(trendMax1<trendMax2)
+           {
+
+            return false;
+
+           }
+
+         trendMin1=getClose(getFirstMin(n));
+         n=getFirstMin(n);
+
+         if(trendMin1<trendMin2)
+           {
+
+            return false;
+
+           }
+
+         return true;
+
+
+        }
+
+     }
+
+   else
+     {
+
+      korrekturDown=false;
+      int n=beginCandle;
+
+      if(getLow(n)>=getLow(n+1)+20*Point)
+        {
+
+         korrekturDown=true;
+
+         trendMin2=getLow(getFirstMin(n));
+         n=getFirstMin(n);
+
+         trendMax2=getHigh(getFirstMax(n));
+         n=getFirstMax(n);
+
+         if(trendMax2<=getHigh(beginCandle))
+           {
+
+            return false;
+
+           }
+
+         trendMin1=getLow(getFirstMin(n));
+         n=getFirstMin(n);
+
+         if(trendMin1<=trendMin2)
+           {
+
+            return false;
+
+           }
+
+         trendMax1=getHigh(getFirstMax(n));
+         n=getFirstMax(n);
+
+         if(trendMax1<=trendMax2)
+           {
+
+            return false;
+
+           }
+
+         return true;
+
+
+        }
+
+      else
+        {
+
+         korrekturDown=false;
+
+         trendMax2=getHigh(getFirstMax(n));
+         n=getFirstMax(n);
+
+         trendMin2=getLow(getFirstMin(n));
+         n=getFirstMin(n);
+
+         trendMax1=getHigh(getFirstMax(n));
+         n=getFirstMax(n);
+
+         if(trendMax1<trendMax2)
+           {
+
+            return false;
+
+           }
+
+         trendMin1=getLow(getFirstMin(n));
+         n=getFirstMin(n);
+
+         if(trendMin1<trendMin2)
+           {
+
+            return false;
+
+           }
+
+         return true;
+
+
+        }
+
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|     Das erste Minimum von n Kerzen finden v.l.n.r.               |
+//+------------------------------------------------------------------+
+int getFirstMin(int n)
+  {
+
+   int k=n;
+
+   if(inUseCandleClose==1)
+     {
+
+      while(getLow(k+1)<=getLow(k))
+        {
+
+         k++;
+
+        }
+
+     }
+
+   else
+     {
+
+      while(getClose(k+1)<=getClose(k))
+        {
+
+         k++;
+
+        }
+
+     }
+
+   return k;
+
+  }
+//+------------------------------------------------------------------+
+//|        Das erste Maximum von n Kerzen finden v.l.n.r.            |
+//+------------------------------------------------------------------+
+int getFirstMax(int n)
+  {
+
+   int k=n;
+
+   if(inUseCandleClose==1)
+     {
+
+      while(getHigh(k+1)>=getHigh(k))
+        {
+
+         k++;
+
+        }
+
+     }
+
+   else
+     {
+
+      while(getClose(k+1)>=getClose(k))
+        {
+
+         k++;
+
+        }
+     }
+
+   return k;
+
+  }
+//+------------------------------------------------------------------+
+//|          Schlusskurs einer Kerze ausgeben                        |
+//+------------------------------------------------------------------+
+double getClose(int candle)
+  {
+
+   return iClose(Symbol(),PERIOD_CURRENT,candle);
+
+  }
+//+------------------------------------------------------------------+
+//|         Eröffnungskurs einer Kerze ausgeben                      |
+//+------------------------------------------------------------------+
+double getOpen(int candle)
+  {
+
+   return iOpen(Symbol(),PERIOD_CURRENT,candle);
+
+  }
+//+------------------------------------------------------------------+
+//|          Hochpunkt einer Kerze ausgeben                          |
+//+------------------------------------------------------------------+
+double getHigh(int candle)
+  {
+
+   return iHigh(Symbol(),PERIOD_CURRENT,candle);
+
+  }
+//+------------------------------------------------------------------+
+//|        Tiefpunkt einer Kerze ausgeben                            |
+//+------------------------------------------------------------------+
+double getLow(int candle)
+  {
+
+   return iLow(Symbol(),PERIOD_CURRENT,candle);
+
+  }
+//+------------------------------------------------------------------+
+//|   Text Objekte sortieren - Offset anpassen                       |
+//+------------------------------------------------------------------+
+void sortTextObjectsOnScreen()
+  {
+
+   offset=0;
+
+   for(int i=0;i<99;i++)
+     {
+
+      if(textObjects[i]!="-1")
+        {
+
+         string name=textObjects[i];
+
+         ObjectSet(name,OBJPROP_YDISTANCE,10+offset);// Y coordinate
+
+         offset+=chartHeight/60;
+
+        }
+
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|    Gibt es zu diesem Preis bereits eine Order?                   |
+//+------------------------------------------------------------------+
+bool orderAlreadyOpened(double orderprice,int magic)
+  {
+
+   for(int i=0;i<OrdersTotal();i++)
+     {
+
+      selectOrder(i,p,trades);
+
+      if(OrderMagicNumber()==magic)
+        {
+
+         if(OrderOpenPrice()==orderprice)
+           {
+
+            return true;
+
+           }
+
+        }
+     }
+   return false;
+
+  }
+//+------------------------------------------------------------------+
+//|       Text eines Objektes ändern                                 |
+//+------------------------------------------------------------------+
+void setObjectText(string objectName,string text)
+  {
+
+   if(ObjectFind(objectName)==-1)
+     {
+
+      Alert("Das Objekt: ",objectName," konnte nicht gefunden werden");
+
+     }
+
+   else
+     {
+
+      ObjectSetString(ChartID(),objectName,OBJPROP_TEXT,text);
+
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|   gezeichnete Objekte auf dem Chart aktualisieren                |
+//+------------------------------------------------------------------+
+void updateObjects()
+  {
+
+//Widerstände und Unterstützung anzeigen
+
+   if(displayTrendLines)
+     {
+
+      for(int i=0;i<100;i++)
+        {
+
+         if(isTrendDown(i))
+           {
+
+            drawHorizontalLine(trendMin2,"sellOrder"+(string)i,clrRed);
+
+           }
+
+         if(isTrendUp(i))
+           {
+
+            drawHorizontalLine(trendMax2,"buyOrder"+(string)i,clrGreen);
+
+           }
+
+        }
+     }
+
+   if(!displayTrendLines)
+     {
+
+      for(int i=0;i<100;i++)
+        {
+
+         if(!notCreated("sellOrder"+(string)i))
+           {
+
+            ObjectDelete(ChartID(),"sellOrder"+(string)i);
+
+           }
+
+         if(!notCreated("buyOrder"+(string)i))
+           {
+
+            ObjectDelete(ChartID(),"buyOrder"+(string)i);
+
+           }
+        }
+
+      ChartRedraw();
+
+     }
+
+//offene Gaps ein/ausblenden
+
+   if(displayOpenGaps)
+     {
+
+      findOpenGap(1000);
+
+      if(notCreated("gapOben"))
+        {
+
+         drawHorizontalLine(gapHigh,"gapOben",clrGreen);
+         labelLine("gapOben","Gap vom "+gapTime+" Hoch",calcLabelOffset(gapHigh,"Hoch"),clrWhite);
+
+        }
+
+      if(notCreated("gapUnten"))
+        {
+
+         drawHorizontalLine(gapLow,"gapUnten",clrRed);
+         labelLine("gapUnten","Gap vom "+gapTime+" Tief",calcLabelOffset(gapLow,"Tief"),clrWhite);
+        }
+     }
+
+   if(!displayOpenGaps)
+     {
+
+      ObjectDelete(ChartID(),"gapOben");
+      ObjectDelete(ChartID(),"gapUnten");
+      ObjectDelete(ChartID(),"Gap vom "+gapTime+" Hoch");
+      ObjectDelete(ChartID(),"Gap vom "+gapTime+" Tief");
+
+      ChartRedraw();
+
+     }
+
+//Durchschnitts Order Preis ein/ausblenden, nur bei gleicher Lotgröße aller Orders!
+//TODO: Multi Symbol Anpassung
+
+   if(displayAverageOrderPrice)
+     {
+
+      if(notCreated("Order Durchschnitt"))
+        {
+         drawHorizontalLine(averageOrderPrice,"Order Durchschnitt",clrAquamarine);
+         labelLine("Order Durchschnitt","Profit Grenze",calcLabelOffset(averageOrderPrice,"Profit Grenze"),clrWhite);
+        }
+
+     }
+
+   if(!displayAverageOrderPrice)
+     {
+
+      ObjectDelete(ChartID(),"Order Durchschnitt");
+      ObjectDelete(ChartID(),"Profit Grenze");
+
+     }
+
+//Aussenstab Linien ein/ausblenden
+
+   if(toggleAussenstabLines) //Aussenstab Grenzen zeichnen wurde auswählt
+     {
+
+      if(inAussenstab()) //Grenzen von Aussenstab einzeichnen
+        {
+
+         double high= iHigh(Symbol(),PERIOD_CURRENT,ASS);
+         double low = iLow(Symbol(),PERIOD_CURRENT,ASS);
+
+         drawCandleBorder(high,low,true,"Aussenstab oben","Aussenstab unten",clrWhite,true);
+
+        }
+
+     }
+
+   if(!toggleAussenstabLines)
+     {
+
+      ObjectDelete(ChartID(),"Aussenstab oben");
+      ObjectDelete(ChartID(),"Aussenstab unten");
+
+     }
+
+   if(!inAussenstab())
+     {
+
+      ObjectDelete(ChartID(),"Aussenstab oben");
+      ObjectDelete(ChartID(),"Aussenstab unten");
+
+     }
+
+//4 Stunden Linien ein/ausblenden
+
+   if(toggle4Hourly)
+     {
+      double high= iHigh(Symbol(),PERIOD_H4,1);
+      double low = iLow(Symbol(),PERIOD_H4,1);
+
+      if(notCreated("H4oben"))
+        {
+
+         drawHorizontalLine(high,"H4oben",clrGreen);
+         labelLine("H4oben","H4 Hoch",5,clrWhite);
+
+        }
+
+      if(notCreated("H4unten"))
+        {
+
+         drawHorizontalLine(low,"H4unten",clrRed);
+         labelLine("H4unten","H4 Tief",5,clrWhite);
+        }
+     }
+
+   if(!toggle4Hourly)
+     {
+
+      ObjectDelete(ChartID(),"H4oben");
+      ObjectDelete(ChartID(),"H4unten");
+      ObjectDelete(ChartID(),"H4 Hoch");
+      ObjectDelete(ChartID(),"H4 Tief");
+
+      ChartRedraw();
+
+     }
+
+//Stunden Linien ein/ausblenden
+
+   if(toggleHourly)
+     {
+      double high= iHigh(Symbol(),PERIOD_H1,1);
+      double low = iLow(Symbol(),PERIOD_H1,1);
+
+      if(notCreated("H1oben"))
+        {
+
+         drawHorizontalLine(high,"H1oben",clrGreen);
+         labelLine("H1oben","H1 Hoch",5,clrWhite);
+
+        }
+
+      if(notCreated("H1unten"))
+        {
+
+         drawHorizontalLine(low,"H1unten",clrRed);
+         labelLine("H1unten","H1 Tief",5,clrWhite);
+        }
+     }
+
+   if(!toggleHourly)
+     {
+
+      ObjectDelete(ChartID(),"H1oben");
+      ObjectDelete(ChartID(),"H1unten");
+      ObjectDelete(ChartID(),"H1 Hoch");
+      ObjectDelete(ChartID(),"H1 Tief");
+
+     }
+
+// Wochen Linien ein/ausblenden
+
+   if(toggleWeekly)
+     {
+      double high= iHigh(Symbol(),PERIOD_W1,1);
+      double low = iLow(Symbol(),PERIOD_W1,1);
+
+      if(notCreated("W1oben"))
+        {
+
+         drawHorizontalLine(high,"W1oben",clrGreen);
+         labelLine("W1oben","W1 Hoch",5,clrWhite);
+
+        }
+
+      if(notCreated("W1unten"))
+        {
+
+         drawHorizontalLine(low,"W1unten",clrRed);
+         labelLine("W1unten","W1 Tief",5,clrWhite);
+        }
+     }
+
+   if(!toggleWeekly)
+     {
+
+      ObjectDelete(ChartID(),"W1oben");
+      ObjectDelete(ChartID(),"W1unten");
+      ObjectDelete(ChartID(),"W1 Hoch");
+      ObjectDelete(ChartID(),"W1 Tief");
+
+     }
+
+// Monats Linien ein/ausblenden
+
+   if(toggleMonthly)
+     {
+      double high= iHigh(Symbol(),PERIOD_MN1,1);
+      double low = iLow(Symbol(),PERIOD_MN1,1);
+
+      if(notCreated("MN1oben"))
+        {
+
+         drawHorizontalLine(high,"MN1oben",clrGreen);
+         labelLine("MN1oben","MN1 Hoch",5,clrWhite);
+
+        }
+
+      if(notCreated("MN1unten"))
+        {
+
+         drawHorizontalLine(low,"MN1unten",clrRed);
+         labelLine("MN1unten","MN1 Tief",5,clrWhite);
+        }
+     }
+
+   if(!toggleMonthly)
+     {
+
+      ObjectDelete(ChartID(),"MN1oben");
+      ObjectDelete(ChartID(),"MN1unten");
+      ObjectDelete(ChartID(),"MN1 Hoch");
+      ObjectDelete(ChartID(),"MN1 Tief");
+
+     }
+
+// Tages Linien ein/ausblenden
+
+   if(toggleDaily)
+     {
+      double high2= iHigh(Symbol(),PERIOD_D1,2);
+      double low2 = iLow(Symbol(),PERIOD_D1,2);
+      double high1= iHigh(Symbol(),PERIOD_D1,1);
+      double low1 = iLow(Symbol(),PERIOD_D1,1);
+      double high0= dailyHigh;
+      double low0 = dailyLow;
+
+      if(notCreated("D0oben"))
+        {
+
+         drawHorizontalLine(high0,"D0oben",clrGreen);
+         labelLine("D0oben","Hoch heute",5,clrWhite);
+
+        }
+
+      if(notCreated("D0unten"))
+        {
+
+         drawHorizontalLine(low0,"D0unten",clrRed);
+         labelLine("D0unten","Tief heute",5,clrWhite);
+        }
+
+      if(notCreated("D1oben"))
+        {
+
+         drawHorizontalLine(high1,"D1oben",clrGreen);
+         labelLine("D1oben","Hoch gestern",5,clrWhite);
+
+        }
+
+      if(notCreated("D1unten"))
+        {
+
+         drawHorizontalLine(low1,"D1unten",clrRed);
+         labelLine("D1unten","Tief gestern",5,clrWhite);
+        }
+
+      if(notCreated("D2oben"))
+        {
+
+         drawHorizontalLine(high2,"D2oben",clrGreen);
+         labelLine("D2oben","Hoch vorgestern",5,clrWhite);
+
+        }
+
+      if(notCreated("D2unten"))
+        {
+
+         drawHorizontalLine(low2,"D2unten",clrRed);
+         labelLine("D2unten","Tief vorgestern",5,clrWhite);
+        }
+
+     }
+
+   if(!toggleDaily)
+     {
+
+      ObjectDelete(ChartID(),"D0oben");
+      ObjectDelete(ChartID(),"D0unten");
+      ObjectDelete(ChartID(),"Hoch heute");
+      ObjectDelete(ChartID(),"Tief heute");
+
+      ObjectDelete(ChartID(),"D1oben");
+      ObjectDelete(ChartID(),"D1unten");
+      ObjectDelete(ChartID(),"Hoch gestern");
+      ObjectDelete(ChartID(),"Tief gestern");
+
+      ObjectDelete(ChartID(),"D2oben");
+      ObjectDelete(ChartID(),"D2unten");
+      ObjectDelete(ChartID(),"Hoch vorgestern");
+      ObjectDelete(ChartID(),"Tief vorgestern");
+
+     }
+
+   if(iHigh(Symbol(),PERIOD_D1,0)>dailyHigh)
+     {
+
+      dailyHigh=iHigh(Symbol(),PERIOD_D1,0);
+      toggleDaily = !toggleDaily;
+      toggleDaily = !toggleDaily;
+
+     }
+
+   if(iLow(Symbol(),PERIOD_D1,0)<dailyLow)
+     {
+
+      dailyLow=iLow(Symbol(),PERIOD_D1,0);
+      toggleDaily = !toggleDaily;
+      toggleDaily = !toggleDaily;
+
+     }
+
+   averageOrderPrice=0;
+   double lotsTemp=0;
+
+   int i=0;
+   int counter=0;
+
+   for(i=0;i<OrdersTotal();i++)
+     {
+
+      selectOrder(i,p,trades);
+
+      if(OrderType()==OP_SELL)
+        {
+
+         averageOrderPrice+=OrderOpenPrice();
+         counter++;
+
+        }
+
+      if(OrderType()==OP_BUY)
+        {
+
+         averageOrderPrice+=OrderOpenPrice();
+         counter++;
+
+        }
+
+     }
+   if(counter>0)
+     {
+      averageOrderPrice=NormalizeDouble(averageOrderPrice/(double)counter,2);
+     }
+   else
+     {
+      averageOrderPrice=0;
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|      Objekt noch nicht kreiert?                                  |
+//+------------------------------------------------------------------+
+bool notCreated(string name)
+  {
+
+   if(ObjectFind(ChartID(),name)==-1)
+     {
+
+      return true;
+
+     }
+
+   else
+     {
+
+      return false;   //Objekt bereits erstellt
+
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|         Auswahl und Anwendung der Stoploss Methode               |
+//+------------------------------------------------------------------+
+void stopLossManagement()
+  {
+
+   if(inStopLossMethod==1) //Stoploss nach den Aussenstäben
+     {
+
+      if(openOrders!=getOpenOrders()) //Es wurde eine neue Order aufgegeben
+        {
+
+         openOrders=getOpenOrders();
+
+         for(int i=0; i<OrdersTotal();i++)
+           {
+
+            selectOrder(i,p,trades);
+
+            if(OrderType()==OP_BUY || OrderType()==OP_SELL)
+              {
+               setStopLossByAussenstab(OrderTicket());
+
+              }
+
+           }
+
+        }
+
+      for(int i=0; i<OrdersTotal();i++) //Hat jede offene Order einen Stoploss ?
+        {
+
+         selectOrder(i,p,trades);
+
+         if(OrderType()==OP_BUY || OrderType()==OP_SELL)
+           {
+
+            if(OrderStopLoss()==0)
+              {
+
+               setStopLossByAussenstab(OrderTicket());
+
+              }
+
+           }
+
+        }
+
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|                Aktionen bei neuer Kerze                          |
+//+------------------------------------------------------------------+
+void newBarManagement()
+  {
+
+   if(oldBarTime!=Time[0]) //Neue Kerze fertig?
+     {
+      oldBarTime=Time[0];
+
+      newestClose=iClose(Symbol(),PERIOD_CURRENT,1);  //neuen Schlusswert speichern
+
+      ASS++;      //Shift des Aussenstabes um 1 erhöhen
+      oldASS++;
+
+      if(inAussenstab())
+        {
+
+         if(oldASS!=ASS)
+           {
+            //Aussenstab Linien neu zeichnen
+
+            toggleAussenstabLines=!toggleAussenstabLines;
+            updateObjects();
+            toggleAussenstabLines=!toggleAussenstabLines;
+
+           }
+
+        }
+
+      oldASS=ASS;
+
+      if(inMultipleCandleTrader==1)
+        {
+
+         multipleCandleTrader();
+
+        }
+
+      if(inAussenStabTrading==1) //Aussenstab Trading aktiviert?
+        {
+
+         aussenstabTrading();
+
+        }
+
+      if(inTradingMethod==1) //Trendhandel aktiviert?
+        {
+         if(isTrendDown(1))
+           {
+
+            if(korrekturDown)
+              {
+
+               if(!orderAlreadyOpened(trendMin2-inSpreadDistance,magicTrend))
+                 {
+
+                  sellStopOrder(trendMin2-inSpreadDistance,magicTrend);
+
+                 }
+
+              }
+
+           }
+
+         if(isTrendUp(1))
+           {
+
+            if(korrekturUp)
+              {
+
+               if(!orderAlreadyOpened(trendMax2+inSpreadDistance,magicTrend))
+                 {
+
+                  buyStopOrder(trendMax2+inSpreadDistance,magicTrend);
+                 }
+
+              }
+
+           }
+
+        }
+
+      if(inStopLossMethod==1)
+        {
+
+         for(int i=0; i<OrdersTotal();i++)
+           {
+
+            selectOrder(i,p,trades);
+
+            if(OrderType()==OP_BUY || OrderType()==OP_SELL)
+              {
+               setStopLossByAussenstab(OrderTicket());
+
+              }
+
+           }
+
+        }
+
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|          Chart Objekte kreieren                                  |
+//+------------------------------------------------------------------+
+void createObjects()
+  {
+
+//--- enable object create events
+   ChartSetInteger(ChartID(),CHART_EVENT_OBJECT_CREATE,true);
+//--- enable object delete events
+   ChartSetInteger(ChartID(),CHART_EVENT_OBJECT_DELETE,true);
+
+   int deletAllObjectsSuccess=ObjectsDeleteAll(ChartID(),-1,-1);
+
+   ChartRedraw();
+
+  }
+//+------------------------------------------------------------------+
+//|          Chart Linie beschriften                                 |
+//+------------------------------------------------------------------+
+void labelLine(string nameOfLine,string label,int offsetToRight,color clr)
+  {
+
+   bool objectCreateSuccess;
+
+   objectCreateSuccess=ObjectCreate(label,OBJ_TEXT,0,Time[0],ObjectGet(nameOfLine,OBJPROP_PRICE1));
+
+   checkObjectCreation(objectCreateSuccess,nameOfLine);  //Objekt erfolgreich erstellt?
+
+   ObjectSetString(ChartID(),label,OBJPROP_TEXT,label);   //Text ändern
+   setObjectColor(label,clr);   //Farbe von Text ändern
+  }
+//+------------------------------------------------------------------+
+//|          Offset für Beschriftung berechnen                       |
+//+------------------------------------------------------------------+
+int calcLabelOffset(double price,string label)
+  {
+
+   int labelOffset=0;
+
+   for(int i=1; i<100;i++)
+     {
+
+      double high= iHigh(Symbol(),PERIOD_CURRENT,i);
+      double low = iLow(Symbol(),PERIOD_CURRENT,i);
+
+      double distance=0;
+
+      if(price>high)
+        {
+
+         distance=price-high;
+
+        }
+
+      if(price<low)
+        {
+
+         distance=low-price;
+
+        }
+
+      if(distance>50)
+        {
+
+         bool distanceOK=true;
+
+         for(int k=i-2;k<i+2;k++)
+           {
+
+            if(k<1)
+              {
+
+               k=1;
+              }
+
+            double highTemp=iHigh(Symbol(),PERIOD_CURRENT,i);
+            double lowTemp=iLow(Symbol(),PERIOD_CURRENT,i);
+
+            if(price>highTemp)
+              {
+
+               distance=price-highTemp;
+
+              }
+
+            if(price<lowTemp)
+              {
+
+               distance=lowTemp-price;
+
+              }
+
+            if(distance<50)
+              {
+
+               distanceOK=false;
+
+              }
+
+           }
+
+         if(distanceOK)
+           {
+
+            labelOffset=i;
+
+            if(labelOffset<StringLen(label))
+              {
+
+               labelOffset=StringLen(label);
+
+               return labelOffset;
+
+              }
+
+            break;
+           }
+
+        }
+      else
+        {
+
+        }
+
+     }
+
+   return StringLen(label); //Keine passende Kerze gefunden
+
+  }
+//+------------------------------------------------------------------+
+//|   Alle Gaps überprüfen, bei evtl. Teilschließungen anpassen      |
+//+------------------------------------------------------------------+
+void checkGaps()
+  {
+
+   bool gapUp=false;
+   bool gapDown=false;
+
+   for(int i=0;i<ArraySize(gapCollection)-4;i+=3)
+     {
+
+      if(gapCollection[i]!=0)
+        {
+
+         if(gapCollection[i]>500)
+           {
+
+            removeGap(i);
+
+           }
+
+         gapCollection[i]++;
+
+        }
+
+     }
+
+   for(int i=0;i<ArraySize(gapCollection)-4;i+=3)
+     {
+      double n1 = gapCollection[i];
+      double n2 = n1-1;
+
+      if(getLow((int)n1)>getHigh((int)n2))
+        {
+
+         gapDown=true;
+         gapUp=false;
+
+        }
+
+      if(getHigh((int)n1)<getLow((int)n2))
+        {
+
+         gapUp=true;
+         gapDown=false;
+
+        }
+
+      if(gapDown)
+        {
+
+         for(int k=(int)n2;k>0;k--)
+           {
+
+            if(getHigh(k)>getHigh((int)n2))
+              {
+
+               if(getHigh(k)>=getLow((int)n1))
+                 {
+
+                  for(int m=0;m<OrdersTotal();m++)
+                    {
+
+                     selectOrder(m,p,trades);
+
+                     double dist1=OrderOpenPrice()-getHigh((int)n2);
+
+                     double dist2=getLow((int)n1)-OrderOpenPrice();
+
+                     if(dist1<0)
+                       {
+
+                        dist1=-dist1;
+                       }
+
+                     if(dist2<0)
+                       {
+
+                        dist2=-dist2;
+                       }
+
+                     if(dist1<20)
+                       {
+
+                        bool a=OrderDelete(OrderTicket(),clrNONE);
+
+                       }
+
+                     if(dist2<20)
+                       {
+
+                        bool b=OrderDelete(OrderTicket(),clrNONE);
+
+                       }
+
+                    }
+
+                  removeGap(n1);
+
+                 }
+
+               else
+                 {
+
+                  modifyGapCollection(n1,getHigh(k),Glow);
+
+                 }
+              }
+
+           }
+
+        }
+
+      if(gapUp)
+        {
+
+         for(int j=(int)n2;j>0;j--)
+           {
+
+            if(getLow(j)<getLow((int)n2))
+              {
+
+               if(getLow(j)<=getHigh((int)n1))
+                 {
+
+                  for(int n=0;n<OrdersTotal();n++)
+                    {
+
+                     selectOrder(n,p,trades);
+
+                     double dist1=OrderOpenPrice()-getHigh((int)n1);
+
+                     double dist2=getLow((int)n2)-OrderOpenPrice();
+
+                     if(dist1<0)
+                       {
+
+                        dist1=-dist1;
+                       }
+
+                     if(dist2<0)
+                       {
+
+                        dist2=-dist2;
+                       }
+
+                     if(dist1<20)
+                       {
+
+                        bool c=OrderDelete(OrderTicket(),clrNONE);
+
+                       }
+
+                     if(dist2<20)
+                       {
+
+                        bool d=OrderDelete(OrderTicket(),clrNONE);
+
+                       }
+
+                    }
+
+                  removeGap(n1);
+
+                 }
+
+               else
+                 {
+
+                  modifyGapCollection(n1,getLow(j),Ghigh);
+
+                 }
+
+              }
+
+           }
+
+        }
+
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|    Gap aus Sammlung entfernen                                    |
+//+------------------------------------------------------------------+
+void removeGap(double n1)
+  {
+
+   for(int i=0;i<ArraySize(gapCollection)-4;i+=3)
+     {
+
+      if(gapCollection[i]==n1)
+        {
+
+         gapTimeCollection[i/3]="0";
+
+         gapCollection[i]=0;
+         gapCollection[i+1]=0;
+         gapCollection[i+2]=0;
+
+        }
+
+     }
+
+   sortGaps();
+
+  }
+  
+
+  
+  void addToSellOrderCollection(double price){
+  
+  sortOrderCollection();
+  
+  for(int i=0;i<ArraySize(sellOrderCollection)-1;i++){
+  
+  if(sellOrderCollection[i]==price){
+  return;
+  }
+  
+  }
+  
+  for(int i=0;i<ArraySize(sellOrderCollection)-1;i++){
+  
+  if(sellOrderCollection[i]==-1){
+  sellOrderCollection[i]=price;
+  break;
+  }
+  
+  }
+  
+  }
+  
+  void addToBuyOrderCollection(double price){
+  
+  sortOrderCollection();
+  
+  for(int i=0;i<ArraySize(buyOrderCollection)-1;i++){
+  
+   if(buyOrderCollection[i]==price){
+   
+   return;
+   
+   }
+  
+  }
+  
+  
+  for(int i=0;i<ArraySize(buyOrderCollection)-1;i++){
+  
+  if(buyOrderCollection[i]==-1){
+  
+  buyOrderCollection[i]=price;
+  break;
+  
+  }
+  
+  }
+  
+  }
+  
+  void sortOrderCollection(){
+  
+   for(int i=0;i<ArraySize(buyOrderCollection)-2;i++)
+     {
+
+      if(buyOrderCollection[i]==-1 && buyOrderCollection[i+1]!=-1)
+        {
+
+         buyOrderCollection[i]=buyOrderCollection[i+1];
+
+        }
+     }
+
+   for(int i=0;i<ArraySize(sellOrderCollection)-2;i++)
+     {
+     
+     if(sellOrderCollection[i]==-1 && sellOrderCollection[i+1]!= -1)
+   {
+      sellOrderCollection[i]=sellOrderCollection[i+1];
+    } 
+     }
+  
+  }
+  
+  
+  void closeAllStopOrders(){
+  
+  for(int i=0;i<OrdersTotal();i++){
+  
+  selectOrder(i,p,trades);
+  
+  
+  if(OrderType() == OP_BUYSTOP || OrderType() == OP_SELLSTOP){
+  
+  bool c = OrderDelete(OrderTicket(),clrNONE);
+  
+  }
+  
+  }
+  
+  }
+  
+//+------------------------------------------------------------------+
+//|   Gap Sammlung sortieren                                         |
+//+------------------------------------------------------------------+
+void sortGaps()
+  {
+
+   for(int i=0;i<ArraySize(gapTimeCollection)-2;i++)
+     {
+
+      if(gapTimeCollection[i]=="0")
+        {
+
+         gapTimeCollection[i]=gapTimeCollection[i+1];
+
+        }
+     }
+
+   for(int i=0;i<ArraySize(gapCollection)-4;i+=3)
+     {
+
+      if(gapCollection[i]==0)
+        {
+
+         gapCollection[i]=gapCollection[i+3];
+         gapCollection[i+1]=gapCollection[i+4];
+         gapCollection[i+2]=gapCollection[i+5];
+
+        }
+
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|    Gaps in Sammlung ändern                                       |
+//+------------------------------------------------------------------+
+void modifyGapCollection(double n1,double value,string direction)
+  {
+
+   if(direction=="high")
+     {
+
+      for(int i=0;i<ArraySize(gapCollection)-4;i+=3)
+        {
+
+         if(gapCollection[i]==n1)
+           {
+
+            gapCollection[i+1]=value;
+
+            break;
+
+           }
+
+        }
+
+     }
+
+   if(direction=="low")
+     {
+
+      for(int i=0;i<ArraySize(gapCollection)-4;i+=3)
+        {
+
+         if(gapCollection[i]==n1)
+           {
+
+            gapCollection[i+2]=value;
+
+            break;
+
+           }
+
+        }
+
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|     offene Gaps in Gap Sammlung aufnehmen                        |
+//+------------------------------------------------------------------+
+void addToGapCollection(double candleNumber,double high,double low)
+  {
+
+   bool add=true;
+//Bereits vorhanden?
+   for(int i=0;i<ArraySize(gapCollection)-4;i+=3)
+     {
+
+      if(gapCollection[i]==candleNumber)
+         return;
+      break;
+      add=false;
+     }
+
+   for(int i=0;i<ArraySize(gapCollection)-4;i+=3)
+     {
+
+      if(gapCollection[i]==0 && add)
+        {
+
+         gapCollection[i]=candleNumber;
+         gapCollection[i+1]=high;
+         gapCollection[i+2]=low;
+         break;
+
+        }
+
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|     Beschriftung für Gaps zur Sammlung hinzufügen                |
+//+------------------------------------------------------------------+
+void addToGapTimeCollection(string str)
+  {
+
+//Bereits vorhanden?
+   for(int i=0;i<ArraySize(gapTimeCollection)-1;i++)
+     {
+
+      if(gapTimeCollection[i]==str)
+         break;
+     }
+
+   for(int i=0;i<ArraySize(gapTimeCollection)-1;i++)
+     {
+
+      if(gapTimeCollection[i]=="0")
+        {
+
+         gapTimeCollection[i]=str;
+         break;
+
+        }
+
+      if(i==ArraySize(gapTimeCollection)-1)//gapTimeCollection voll?
+        {
+
+         gapTimeCollection[0]="0";
+
+        }
+
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|        Ist eine Order im Abstand von distance ?                  |
+//+------------------------------------------------------------------+
+bool noOrderNear(double price,double distance,int magic)
+  {
+
+   double open=0;
+
+   double d=0;
+
+   for(int i=0;i<OrdersTotal();i++)
+     {
+
+      selectOrder(i,p,trades);
+
+      if(OrderMagicNumber()==magic)
+        {
+
+         if(OrderType()==OP_BUY || OrderType()==OP_BUYSTOP)
+           {
+
+            open=OrderOpenPrice();
+
+            d=price-open;
+
+            if(d<0)
+              {
+
+               d=-d;
+
+              }
+
+            if(d<distance)
+              {
+
+               return false;
+
+              }
+
+           }
+
+         if(OrderType()==OP_SELL || OrderType()==OP_SELLSTOP)
+           {
+
+            open=OrderOpenPrice();
+
+            d=open-price;
+
+            if(d<0)
+              {
+
+               d=-d;
+
+              }
+
+            if(d<distance)
+              {
+
+               return false;
+
+              }
+
+           }
+
+        }
+     }
+
+
+   return true;
+
+
+  }
+//+------------------------------------------------------------------+
+//|   Die letzten N Kerzen auf offene Gaps untersuchen               |
+//+------------------------------------------------------------------+
+bool findOpenGap(int n)
+  {
+
+   bool gapFound=false;
+
+   for(int i=2;i<n;i++)
+     {
+
+      if(getHigh(i-1)<getLow(i)-50*Point)
+        {
+
+         if(verifyGap(i))
+           {
+            gapLow=getHigh(i-1);
+            gapHigh = getLow(i);
+            gapTime = (string) TimeDay(iTime(Symbol(),PERIOD_CURRENT,i)) +"." + (string) TimeMonth(iTime(Symbol(),PERIOD_CURRENT,i))+"."+(string) TimeYear(iTime(Symbol(),PERIOD_CURRENT,i));
+            addToGapCollection(i,gapHigh,gapLow);
+            addToGapTimeCollection(gapTime);
+
+            gapFound=true;
+           }
+        }
+
+      if(getLow(i-1)>getHigh(i)+50*Point)
+        {
+         if(verifyGap(i))
+           {
+            gapLow = getHigh(i);
+            gapHigh= getLow(i-1);
+            gapTime=(string) TimeDay(iTime(Symbol(),PERIOD_CURRENT,i))+"."+(string) TimeMonth(iTime(Symbol(),PERIOD_CURRENT,i))+"."+(string) TimeYear(iTime(Symbol(),PERIOD_CURRENT,i));
+            addToGapCollection(i,gapHigh,gapLow);
+            addToGapTimeCollection(gapTime);
+
+            gapFound=true;
+           }
+        }
+
+     }
+   gapLow=0;
+   gapHigh=0;
+
+   return gapFound;
+  }
+//+------------------------------------------------------------------+
+//|      Gap bestätigen                                              |
+//+------------------------------------------------------------------+
+bool verifyGap(int i)
+  {
+
+   double high1 = getHigh(i-1);
+   double high2 = getHigh(i);
+   double low1 = getLow(i-1);
+   double low2 = getLow(i);
+
+   bool gapUp=false;
+
+   if(high2>high1)
+     {
+
+      gapUp=true;
+
+     }
+
+   for(int k=i-2;k>1;k--)
+     {
+
+      if(k<1)
+        {
+         k=1;
+
+        }
+
+      if(gapUp)
+        {
+
+         if(getHigh(k)>low2)
+           {
+
+            return false;   //Gap bereits geschlossen
+
+           }
+        }
+
+      if(!gapUp)
+        {
+
+         if(getLow(k)<high2)
+           {
+
+            return false;      //Gap bereits geschlossen
+
+           }
+
+        }
+
+     }
+
+   return true;
+
+  }
+//+------------------------------------------------------------------+
+//|  Am Hoch und Tiefpunkt einer Kerze waagerechte Linien zeichen    |
+//|    Mit onlyRight, wird die Linie nur nach Rechts gezeichnet      |
+//+------------------------------------------------------------------+
+void drawCandleBorder(double high,double low,bool onlyRight,string nameTop,string nameBottom,color clr,bool dashed)
+  {
+
+   bool objectCreateSuccess;
+
+   if(!onlyRight)
+     {
+
+      //Obere Linie
+
+      drawHorizontalLine(high,nameTop,clr);
+
+      if(dashed)
+        {
+         ObjectSetInteger(ChartID(),nameTop,OBJPROP_STYLE,STYLE_DASH);  //gestrichelte Linie
+        }
+
+      //Untere Linie
+
+      drawHorizontalLine(low,nameBottom,clr);
+
+      if(dashed)
+        {
+
+         ObjectSetInteger(ChartID(),nameBottom,OBJPROP_STYLE,STYLE_DASH);  //gestrichelte Linie
+        }
+
+     }
+
+   else
+     {
+
+      if(ObjectFind(ChartID(),nameTop)==-1) //Objekt nicht bereits erstellt
+        {
+
+         objectCreateSuccess=ObjectCreate(ChartID(),nameTop,OBJ_TREND,0,Time[ASS],high,Time[0],high);   //Linie ab dem Aussenstab oben nach rechts
+
+         checkObjectCreation(objectCreateSuccess,nameTop);
+
+         setObjectColor(nameTop,clrWhite);
+
+         if(dashed)
+           {
+
+            ObjectSetInteger(ChartID(),nameTop,OBJPROP_STYLE,STYLE_DASH);  //gestrichelte Linie
+           }
+
+        }
+
+      if(ObjectFind(ChartID(),nameBottom)==-1) //Objekt nicht bereits erstellt
+        {
+
+         objectCreateSuccess=ObjectCreate(ChartID(),nameBottom,OBJ_TREND,0,Time[ASS],low,Time[0],low);   //Linie ab dem Aussenstab unten nach rechts
+
+         checkObjectCreation(objectCreateSuccess,nameBottom);
+
+         setObjectColor(nameBottom,clrWhite);
+
+         if(dashed)
+           {
+
+            ObjectSetInteger(ChartID(),nameBottom,OBJPROP_STYLE,STYLE_DASH);  //gestrichelte Linie
+           }
+
+        }
+
+     }
+
+   ChartRedraw();
+
+  }
+//+------------------------------------------------------------------+
+//|   Eine waagerechte Linie an der übergebenen Position zeichnen    |
+//+------------------------------------------------------------------+
+void drawHorizontalLine(double position,string name,color clr)
+  {
+
+   bool objectCreateSuccess;
+
+   if(ObjectFind(name)==-1)
+     {
+
+      objectCreateSuccess=ObjectCreate(ChartID(),name,OBJ_HLINE,0,0,position);
+
+      checkObjectCreation(objectCreateSuccess,name);  //Objekt erfolgreich erstellt
+
+      setObjectColor(name,clr);
+
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|      Die Farbe eines Objektes ändern                             |
+//+------------------------------------------------------------------+
+void setObjectColor(string name,color clr)
+  {
+
+   if(ObjectFind(name)==-1)
+     {
+
+      Alert("Das Objekt: ",name," konnte nicht gefunden werden");
+
+     }
+
+   else
+     {
+
+      ObjectSetInteger(ChartID(),name,OBJPROP_COLOR,clr);
+
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|     Hat Kerze 1 im Aussenstab einer anderen Kerze geschlossen?    |
+//+------------------------------------------------------------------+
+bool inAussenstab()
+  {
+
+   ASS=2;
+
+   bool inside=false;
+
+   for(int i=50; i>0;i--)
+     {
+
+      double close=iClose(Symbol(),PERIOD_CURRENT,i);   //Schlusskurs von  Kerze i
+
+      double high=iHigh(Symbol(),PERIOD_CURRENT,1+i); //High von Aussenstab 
+
+      double low=iLow(Symbol(),PERIOD_CURRENT,1+i);     //Low von Aussenstab
+
+      if(close<high && close>low)
+        {
+
+         ASS=i+1;      //Aussenstab gefunden
+         inside=true;
+
+         for(int k=1;k<ASS;k++)
+           {
+
+            double closeTemp=iClose(Symbol(),PERIOD_CURRENT,k);   //Schlusskurs von  Kerze k  (temp)
+
+            double highTemp=iHigh(Symbol(),PERIOD_CURRENT,ASS); //High von Aussenstab        (temp)
+
+            double lowTemp=iLow(Symbol(),PERIOD_CURRENT,ASS);     //Low von Aussenstab       (temp)
+
+            if(closeTemp>highTemp || closeTemp<lowTemp) //Aussenstab bestätigen
+              {
+
+               inside=false;
+               break;
+
+              }
+           }
+        }
+
+      if(inside)
+        {
+
+         break;
+        }
+
+     }
+
+   if(!inside)
+     {
+
+      ASS=2;
+
+     }
+
+   return inside;
+
+  }
+//+------------------------------------------------------------------+
+//|      Spread des aktuellen Symbols ausgeben                       |
+//+------------------------------------------------------------------+
+double getSpread()
+  {
+
+   return MarketInfo(Symbol(),MODE_SPREAD)*Point;
+
+  }
+//+------------------------------------------------------------------+
+//|           Trailing Stoploss mit vorgegebenem Abstand             |
+//+------------------------------------------------------------------+
+void trailingStopLoss()
+  {
+
+   double trailingSL= 0;
+   double oldSLSell = 10000000;
+   double oldSLBuy=0;
+   double distance= 0;
+
+   for(int i=0;i<OrdersTotal();i++)
+     {
+
+      selectOrder(i,p,trades);
+
+      //int magicTrend = 1337;
+      //int magicGapCamp = 1338;
+      //int magicAussenstab = 1339;
+      //int magicStopOrder100 = 1340;
+
+
+
+      switch(OrderMagicNumber())
+        {
+
+         case 1337: distance=inTrailingDistance;
+         break;
+
+         case 1338: distance=inTrailingGapCamper;
+         break;
+
+         case 1339: distance=inTrailingAussenstab;
+         break;
+
+         case 1341: distance=inReverseCandleDistance;
+         break;
+
+         case 1342: distance=inMultipleCandleDistance;
+         break;
+
+         default: distance=inTrailingDistance;
+
+        }
+
+      if(OrderType()==OP_BUY)
+        {
+
+         if((Ask-getSpread())-OrderOpenPrice()>=distance && (Ask-getSpread())-distance>OrderStopLoss())
+           {
+
+            bool a=OrderModify(OrderTicket(),OrderOpenPrice(),(Ask-getSpread())-distance,OrderTakeProfit(),0,clrNONE);
+
+           }
+        }
+
+      if(OrderType()==OP_SELL)
+        {
+
+         if(OrderOpenPrice()-((Bid+getSpread())+getSpread())>=distance && (Bid+getSpread())+distance<OrderStopLoss())
+           {
+
+            bool b=OrderModify(OrderTicket(),OrderOpenPrice(),(Bid+getSpread())+distance,OrderTakeProfit(),0,clrNONE);
+
+           }
+
+        }
+
+     }
+  }
+//+------------------------------------------------------------------+
+//|   Takeprofit von allen Orders löschen                            |
+//+------------------------------------------------------------------+
+void deleteAllTakeProfit()
+  {
+
+   for(int i=0;i<OrdersTotal();i++)
+     {
+
+      selectOrder(i,p,trades);
+
+      if(OrderType()==OP_BUY || OrderType()==OP_SELL)
+        {
+
+         setTakeProfit(OrderTicket(),0);
+        }
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|   StopLoss von allen Orders löschen                              |
+//+------------------------------------------------------------------+
+void deleteAllStopLoss()
+  {
+
+   for(int i=0;i<OrdersTotal();i++)
+     {
+
+      selectOrder(i,p,trades);
+
+      if(OrderType()==OP_BUY || OrderType()==OP_SELL)
+        {
+
+         setStopLoss(OrderTicket(),0);
+        }
+
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|      Takeprofit von allen Orders um einen bestimmen Wert erhöhen |
+//+------------------------------------------------------------------+
+void changeTakeProfitOfAllOrders(int increase)
+  {
+
+   for(int i=0;i<OrdersTotal();i++)
+     {
+
+      selectOrder(i,p,trades);
+
+      if(OrderType()==OP_BUY)
+        {
+
+         setTakeProfit(OrderTicket(),OrderTakeProfit()+increase);
+
+        }
+
+      if(OrderType()==OP_SELL)
+        {
+
+         setTakeProfit(OrderTicket(),OrderTakeProfit()-increase);
+
+        }
+
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|      Takeprofit auf Durchschnittspreis aller Orders setzen       |
+//+------------------------------------------------------------------+  
+void setTakeProfitToAveragePrice()
+  {
+
+   for(int i=0;i<OrdersTotal();i++)
+     {
+
+      selectOrder(i,p,trades);
+
+      if(OrderType()==OP_BUY)
+        {
+
+         setTakeProfit(OrderTicket(),averageOrderPrice+1);
+
+        }
+
+      if(OrderType()==OP_SELL)
+        {
+
+         setTakeProfit(OrderTicket(),averageOrderPrice-1);
+
+        }
+
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|      Stoploss von allen Orders um einen bestimmen Wert erhöhen   |
+//+------------------------------------------------------------------+
+void changeStopLossOfAllOrders(int increase)
+  {
+
+   for(int i=0;i<OrdersTotal();i++)
+     {
+
+      selectOrder(i,p,trades);
+
+      if(OrderType()==OP_BUY)
+        {
+
+         setStopLoss(OrderTicket(),OrderStopLoss()+increase);
+
+        }
+
+      if(OrderType()==OP_SELL)
+        {
+
+         setStopLoss(OrderTicket(),OrderStopLoss()-increase);
+
+        }
+
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|   Den Stoploss aller Orders auf den Durchschnittspreis setzen    |
+//+------------------------------------------------------------------+
+void setStopLossToOrderAveragePrice()
+  {
+
+   int littlewin=0;
+
+   for(int i=0;i<OrdersTotal();i++)
+     {
+
+      selectOrder(i,p,trades);
+
+      if(OrderType()==OP_BUY)
+        {
+
+         littlewin=1;      //Ein Pünktchen kann man mitnehmen :)
+        }
+      if(OrderType()==OP_SELL)
+        {
+         littlewin=-1;
+        }
+
+      setStopLoss(OrderTicket(),averageOrderPrice+littlewin);
+
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|   alle offenen Orders schließen                                  |
+//+------------------------------------------------------------------+
+void closeAllOrders()
+  {
+   int total=OrdersTotal();
+   for(int i=total-1;i>=0;i--)
+     {
+      selectOrder(i,p,trades);
+      int type=OrderType();
+
+      bool result=false;
+
+      switch(type)
+        {
+         //Close opened long positions
+         case OP_BUY       : result=OrderClose(OrderTicket(),OrderLots(),MarketInfo(OrderSymbol(),MODE_BID),5,clrBlue);
+         break;
+
+         //Close opened short positions
+         case OP_SELL      : result=OrderClose(OrderTicket(),OrderLots(),MarketInfo(OrderSymbol(),MODE_ASK),5,clrRed);
+         break;
+
+         case OP_SELLSTOP: 
+         
+            
+            result=OrderDelete(OrderTicket(),clrNONE);
+
+           
+         break;
+
+         case OP_BUYSTOP: 
+            result=OrderDelete(OrderTicket(),clrNONE);
+
+         break;
+
+        }
+
+      //TODO LATER: Alert bei result = false , für stop orders
+
+     }
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+double getCandleBodySize(int n)
+  {
+
+   double size=getClose(n)-getOpen(n);
+
+   if(size<0)
+     {
+
+      size=-size;
+
+     }
+
+   return size;
+
+  }
+//+------------------------------------------------------------------+
+//|      Die Größe einer Kerze ausgeben (von Low bis High)           |
+//+------------------------------------------------------------------+
+double getCandleSize(int n)
+  {
+
+   double size=iHigh(Symbol(),PERIOD_CURRENT,n)-iLow(Symbol(),PERIOD_CURRENT,n);
+
+   if(size<0)
+     {
+
+      size=-size;
+
+     }
+
+   return size;
+
+  }
+//+------------------------------------------------------------------+
+//|           Überprüft ob Kerze Grün (positiv) ist                  |
+//| Rückgabe : 1: Grün |  0: weder noch  | -1: Rot                   |
+//+------------------------------------------------------------------+
+int candleColor(int shift)
+  {
+
+   if(getClose(shift)>getOpen(shift))
+     {
+
+      //Kerze ist grün
+      return 1;
+
+     }
+   else if(getClose(shift)<getOpen(shift))
+     {
+
+      //Kerze ist rot
+      return -1;
+
+     }
+
+   else if(getClose(shift)==getOpen(shift))
+     {
+
+      //Eröffnungs - und Schlusskurs sind gleich
+      return 0;
+
+     }
+
+   else
+     {
+
+      return -10;
+
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|          War die Erstellung des Objektes erfolgreich?            |
+//+------------------------------------------------------------------+
+void  checkObjectCreation(bool success,string objectName)
+  {
+
+   if(success)
+     {
+
+      //erfolg
+
+     }
+
+   else
+     {
+
+      Alert("Beim Einzeichnen von ",objectName," gab es einen Fehler : ",GetLastError());
+
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|       Grundlegende Werte in  Variablen speichern                 |
+//+------------------------------------------------------------------+
+void saveVariables()
+  {
+
+   balance=AccountInfoDouble(ACCOUNT_BALANCE);
+
+   for(int i=0;i<ArraySize(gapCollection)-1;i++)
+     {
+
+      gapCollection[i]=0;
+
+     }
+
+   for(int i=0;i<ArraySize(gapTimeCollection)-1;i++)
+     {
+
+      gapTimeCollection[i]="0";
+
+     }
+
+   totalLots=(int) inLots;
+
+   if(inLotsIncrease==1)
+     {
+
+      for(int i=0;i<ArraySize(lotStorage)-1;i++)
+        {
+
+         lotStorage[i]=0;
+
+        }
+
+     }
+
+   else
+     {
+
+      lotStorage[0]=totalLots;
+
+     }
+     
+     for(int f = 0; f<ArraySize(buyOrderCollection)-1;f++){
+     
+     buyOrderCollection[f]=-1;
+     
+     }
+     
+     for(int g = 0; g<ArraySize(sellOrderCollection)-1;g++){
+     
+     sellOrderCollection[g]=-1;
+     
+     }
+
+   openOrders=getOpenOrders();  //Anzahl der offenen Orders im Symbol bestimmen
+
+   currentTimeFrame=PERIOD_CURRENT;  //Aktuellen Time Frame speichern
+
+   for(int i=0; i<100;i++)
+     {
+
+      textObjects[i]="-1";
+
+     }
+
+   oldBarTime=Time[0];  //Zeit der aktuellen Kerze speichern
+
+   newestClose=iClose(Symbol(),PERIOD_CURRENT,1);  //Schlusswert von Candle 1 speichern    
+
+   ASS=2; //Startwert für Aussenstabshift
+
+   EventSetTimer(1);    //Timer auf 1 Sekunde
+
+   chartHeight=(int) ChartGetInteger(0,CHART_HEIGHT_IN_PIXELS,0);
+   chartWidth=(int) ChartGetInteger(0,CHART_WIDTH_IN_PIXELS,0);
+
+  }
+//+------------------------------------------------------------------+
+//|          StopLoss initialisieren                                 |
+//+------------------------------------------------------------------+
+void initStopLoss()
+  {
+
+   if(inStopLossMethod==1)
+     {
+
+      ASS=2;
+
+      if(OrdersTotal()>0) //initialien Stoploss für alle Orders festlegen
+        {
+         for(int i=0;i<OrdersTotal();i++)
+           {
+
+            selectOrder(i,p,trades);
+
+            if(OrderType()==OP_BUY || OrderType()==OP_SELL)
+              {
+
+               setStopLossByAussenstab(OrderTicket());
+
+              }
+
+           }
+        }
+
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|    Wurde eine Taste gedrückt? Falls ja, Aktionen ausführen       |
+//+------------------------------------------------------------------+
+void checkIfKeyPressed(int id,long lparam)
+  {
+
+   if(id==CHARTEVENT_KEYDOWN && inKeyShortcuts==1)
+     {
+
+      if(lparam==KEY_K)
+        {
+
+         shortCutsDeactivated=!shortCutsDeactivated;
+
+        }
+
+      if(!shortCutsDeactivated) //HIER NACH NEUE TASTEN EINFÜGEN
+        {
+
+         if(lparam==KEY_T)
+           {
+
+            displayTrendLines=!displayTrendLines;
+
+           }
+
+         if(lparam==KEY_N)
+           {
+
+            manualTrailing=!manualTrailing;
+
+           }
+
+         if(manualTrailing)
+           {
+
+            if(lparam==KEY_SHIFT)
+              {
+
+               enableAverageStopLossMode=!enableAverageStopLossMode;
+
+              }
+
+            if(lparam==KEY_8)
+              {
+
+               manualTrailingDistance++;
+
+              }
+            if(lparam==KEY_9)
+              {
+
+               if(inTrailingDistance+manualTrailingDistance>3)
+                 {
+
+                  manualTrailingDistance--;
+                 }
+
+              }
+
+            manualTrailing=false;
+            updateStatus();
+            manualTrailing=true;
+            updateStatus();
+
+           }
+
+         if(lparam==KEY_E)
+           {
+
+            enableOCTO=!enableOCTO;
+
+           }
+
+         if(lparam==KEY_G)
+           {
+
+            displayOpenGaps=!displayOpenGaps;
+
+           }
+
+         if(lparam==KEY_V)
+           {
+
+            deleteAllStopLoss();
+
+           }
+
+         if(lparam==KEY_J)
+           {
+
+            deleteAllTakeProfit();
+
+           }
+
+         if(lparam==KEY_R)
+           {
+
+            setTakeProfitToAveragePrice();
+
+           }
+
+         if(lparam==KEY_U)
+           {
+
+            changeTakeProfitOfAllOrders(1);
+
+           }
+
+         if(lparam==KEY_Z)
+           {
+
+            changeTakeProfitOfAllOrders(-1);
+
+           }
+
+         if(lparam==KEY_F)
+           {
+
+            displayWinPercentage=!displayWinPercentage;
+
+           }
+
+         if(lparam==KEY_Y)
+           {
+
+            changeStopLossOfAllOrders(1);
+
+           }
+
+         if(lparam==KEY_X)
+           {
+
+            changeStopLossOfAllOrders(-1);
+
+           }
+
+         if(lparam==KEY_Q)
+           {
+
+            setStopLossToOrderAveragePrice();
+
+           }
+
+         if(lparam==KEY_A)
+           {
+
+            enableAFKSoundMode=!enableAFKSoundMode;
+
+           }
+
+         if(lparam==KEY_P)
+           {
+
+            displayAverageOrderPrice=!displayAverageOrderPrice;
+
+           }
+
+         if(lparam==KEY_H)
+           {
+
+            toggleHelp=!toggleHelp;
+
+           }
+
+         if(lparam==KEY_C)
+           {
+
+            closeAllOrders();
+
+           }
+
+         if(lparam==KEY_D)
+           {
+
+            toggleDaily=!toggleDaily;
+
+           }
+
+         if(lparam==KEY_W)
+           {
+
+            toggleWeekly=!toggleWeekly;
+
+           }
+
+         if(lparam==KEY_M)
+           {
+
+            toggleMonthly=!toggleMonthly;
+
+           }
+
+         if(lparam==KEY_1 && !displayLots)
+           {
+
+            toggleHourly=!toggleHourly;
+
+           }
+
+         if(lparam==KEY_4 && !displayLots)
+           {
+
+            toggle4Hourly=!toggle4Hourly;
+
+           }
+
+         if(lparam==KEY_I)
+           {
+
+            toggleAussenstabLines=!toggleAussenstabLines;
+
+           }
+
+         if(lparam==KEY_S)
+           {
+
+            sellStopOrder(magicStopOrder100);
+
+           }
+
+         if(lparam==KEY_B)
+           {
+
+            buyStopOrder(magicStopOrder100);
+
+           }
+
+         if(lparam==KEY_L)
+           {
+
+            displayLots=!displayLots;
+
+           }
+
+         if(displayLots)
+           {
+
+            if(lparam==KEY_3)
+              {
+
+               if(inLots+manualLots>0)
+                 {
+
+                  manualLots-=0.1;
+
+                 }
+
+              }
+
+            if(lparam==KEY_4)
+              {
+
+               if(inLots+manualLots-1>0)
+                 {
+
+                  manualLots-=1;
+
+                 }
+
+              }
+
+            if(lparam==KEY_1)
+              {
+
+               manualLots+=0.1;
+
+              }
+
+            if(lparam==KEY_2)
+              {
+
+               manualLots+=1;
+
+              }
+
+            //Änderungen wirksam machen
+
+            displayLots=false;
+            updateStatus();
+            displayLots=true;
+            updateStatus();
+
+           }
+
+         if(lparam==KEY_O)
+           {
+
+            displayResistanceAndSupport=!displayResistanceAndSupport;
+
+           }
+
+        }
+
+     }
+
+  }
+
+//+------------------------------------------------------------------+
+//|     buy order eröffnen - Automatisches Lotmanagement             |
+//+------------------------------------------------------------------+
+void openbuy(double stoplossDistance,double takeprofitDistance,int magic)
+  {
+
+   double stoploss=0;
+   double takeprofit=0;
+
+   if(stoplossDistance>0)
+     {
+      stoploss=Ask-stoplossDistance;
+     }
+   if(takeprofitDistance>0)
+     {
+      takeprofit=Ask+takeprofitDistance;
+     }
+
+   if(inLotsIncrease==1)
+     {
+
+      for(int i=0;i<ArraySize(lotStorage)-1;i++)
+        {
+
+         if(lotStorage[i]!=0)
+           {
+
+            manualLots=lotStorage[i];
+
+            int ticket=OrderSend(Symbol(),OP_BUY,manualLots,Ask,3,stoploss,takeprofit,NULL,magic,0,clrBlue);
+
+            if(ticket<0)
+              {
+
+               Alert(GetLastError());
+
+              }
+
+           }
+        }
+     }
+   else
+     {
+
+      int ticket=OrderSend(Symbol(),OP_BUY,inLots,Ask,3,stoploss,takeprofit,NULL,magic,0,clrBlue);
+
+      if(ticket<0)
+        {
+
+         Alert(GetLastError());
+
+        }
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|     sell order eröffnen                                          |
+//+------------------------------------------------------------------+
+void opensell(double stoplossDistance,double takeprofitDistance,int magic)
+  {
+
+   double stoploss=0;
+   double takeprofit=0;
+
+   if(stoplossDistance>0)
+     {
+      stoploss=Bid+stoplossDistance;
+     }
+   if(takeprofitDistance>0)
+     {
+      takeprofit=Bid-takeprofitDistance;
+     }
+
+   if(inLotsIncrease==1)
+     {
+
+      for(int i=0;i<ArraySize(lotStorage)-1;i++)
+        {
+
+         if(lotStorage[i]!=0)
+           {
+
+            manualLots=lotStorage[i];
+
+            int ticket=OrderSend(Symbol(),OP_SELL,manualLots,Bid,3,stoploss,takeprofit,NULL,magic,0,clrRed);
+
+            if(ticket<0)
+              {
+
+               Alert(GetLastError());
+
+              }
+
+           }
+        }
+     }
+   else
+     {
+
+      int ticket=OrderSend(Symbol(),OP_SELL,inLots,Bid,3,stoploss,takeprofit,NULL,magic,0,clrRed);
+      if(ticket<0)
+        {
+
+         Alert(GetLastError());
+
+        }
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|     Den Kontostand von gestern ausgeben                          |
+//+------------------------------------------------------------------+
+double getAccountBalanceFromLastDay()
+  {
+   datetime now=TimeCurrent();
+   datetime tod=now%86400;
+   datetime today=iTime(NULL,PERIOD_D1,0);
+   datetime yesterday=iTime(NULL,PERIOD_D1,1);
+   datetime todYesterday=yesterday+tod;
+
+   double profitToday=0;
+   double balanceTemp=0;
+
+   for(int i=0;i<OrdersHistoryTotal();i++)
+     {
+      selectOrder(i,p,history);
+
+      datetime orderTime=OrderOpenTime();
+
+      if(orderTime>today)
+        {
+
+         profitToday+=OrderProfit();
+
+        }
+
+     }
+
+   balanceTemp=AccountBalance()-profitToday;
+
+   return balanceTemp;
+
+  }
+//+------------------------------------------------------------------+
+//|       Die Erste Order ausgeben                                   |
+//+------------------------------------------------------------------+
+int getFirstOrder()
+  {
+
+   selectOrder(0,p,trades);
+
+   return OrderTicket();
+
+  }
+//+------------------------------------------------------------------+
+//|   Eine Sellstop Order eröffnen in 100P. Abstand                  |
+//+------------------------------------------------------------------+
+bool sellStopOrder(int magic)
+  {
+
+   string date=(string) Year()+"."+(string) Month()+"."+(string) Day()+". 22:30:00";
+
+   datetime expiration=StrToTime(date);
+
+   bool orderSuccess=false;
+
+   if(inLotsIncrease==1)
+     {
+
+      for(int i=0; i<ArraySize(lotStorage)-1;i++)
+        {
+
+         if(lotStorage[i]!=0)
+           {
+
+            manualLots=lotStorage[i];
+
+            int ticket=OrderSend(Symbol(),OP_SELLSTOP,manualLots,Bid-100,3,Bid+inStopLoss-100,Bid-inTakeProfit-100,NULL,magic,expiration,clrNONE);
+
+            if(ticket<0)
+              {
+
+               Alert(GetLastError());
+               return false;
+
+              }
+            orderSuccess=true;
+
+           }
+        }
+     }
+
+   else
+     {
+
+      int ticket=OrderSend(Symbol(),OP_SELLSTOP,inLots,Bid-100,3,Bid+inStopLoss-100,Bid-inTakeProfit-100,NULL,magic,expiration,clrNONE);
+
+      if(ticket<0)
+        {
+
+         Alert(GetLastError());
+         return false;
+
+        }
+      orderSuccess=true;
+
+     }
+
+   return orderSuccess;
+
+
+  }
+//+------------------------------------------------------------------+
+//|   Eine Sellstop Order zu gegebenem Kurs eröffnen                 |
+//+------------------------------------------------------------------+
+bool sellStopOrder(double price,int magic)
+  {
+
+   double stoploss=0;
+   double takeprofit=0;
+   bool orderSuccess= false;
+
+   if(inStopLoss!=0)
+     {
+
+      stoploss=price+inStopLoss;
+
+     }
+
+   if(inTakeProfit!=0)
+     {
+
+      takeprofit=price-inTakeProfit;
+
+     }
+
+   if(inLotsIncrease==1)
+     {
+
+      for(int i=0; i<ArraySize(lotStorage)-1;i++)
+        {
+
+         if(lotStorage[i]!=0)
+           {
+
+            manualLots=lotStorage[i];
+
+            int ticket=OrderSend(Symbol(),OP_SELLSTOP,manualLots,price,3,NormalizeDouble(stoploss,Digits),takeprofit,NULL,magic,0,clrNONE);
+
+            if(ticket<0)
+              {
+
+               Alert(GetLastError());
+               return false;
+
+              }
+            orderSuccess=true;
+
+           }
+        }
+     }
+
+   else
+     {
+
+      int ticket=OrderSend(Symbol(),OP_SELLSTOP,inLots,price,3,NormalizeDouble(stoploss,Digits),takeprofit,NULL,magic,0,clrNONE);
+
+      if(ticket<0)
+        {
+
+         Alert(GetLastError());
+         return false;
+
+        }
+
+      orderSuccess=true;
+
+     }
+
+   return orderSuccess;
+
+  }
+//+------------------------------------------------------------------+
+//|   Eine Sellstop Order zu gegebenem Kurs mit gegebenen Lots       |
+//+------------------------------------------------------------------+
+bool sellStopOrder(double lots,double price,int magic)
+  {
+
+   double stoploss=0;
+   double takeprofit=0;
+
+   if(inStopLoss!=0)
+     {
+
+      stoploss=price+inStopLoss;
+
+     }
+
+   if(inTakeProfit!=0)
+     {
+
+      takeprofit=price-inTakeProfit;
+
+     }
+
+   int ticket=OrderSend(Symbol(),OP_SELLSTOP,lots,price,3,NormalizeDouble(stoploss,Digits),takeprofit,NULL,magic,0,clrNONE);
+
+   if(ticket<0)
+     {
+
+      return false;
+     }
+
+   return true;
+
+
+  }
+//+------------------------------------------------------------------+
+//|  Eine Buystop Order eröffnen in 100P. Abstand                    |
+//+------------------------------------------------------------------+
+bool buyStopOrder(int magic)
+  {
+
+   string date=(string) Year()+"."+(string) Month()+"."+(string) Day()+". 22:30:00";
+
+   datetime expiration=StrToTime(date);
+   bool orderSuccess=false;
+
+   if(inLotsIncrease==1)
+     {
+
+      for(int i=0; i<ArraySize(lotStorage)-1;i++)
+        {
+
+         if(lotStorage[i]!=0)
+           {
+
+            manualLots=lotStorage[i];
+
+            int ticket=OrderSend(Symbol(),OP_BUYSTOP,manualLots,Ask+100,3,Ask-inStopLoss+100,Ask+inTakeProfit+100,NULL,magic,expiration,clrNONE);
+
+            if(ticket<0)
+              {
+
+               Alert(GetLastError());
+               return false;
+
+              }
+            orderSuccess=true;
+
+           }
+        }
+     }
+
+   else
+     {
+      int ticket=OrderSend(Symbol(),OP_BUYSTOP,inLots,Ask+100,3,Ask-inStopLoss+100,Ask+inTakeProfit+100,NULL,magic,expiration,clrNONE);
+
+      if(ticket<0)
+        {
+
+         Alert(GetLastError());
+         return false;
+
+        }
+
+      orderSuccess=true;
+     }
+
+   return orderSuccess;
+
+  }
+//+------------------------------------------------------------------+
+//|  Eine Buystop Order zu gegebenem Kurs eröffnen                   |
+//+------------------------------------------------------------------+
+bool buyStopOrder(double price,int magic)
+  {
+
+   double stoploss=0;
+   double takeprofit=0;
+   bool orderSuccess= false;
+
+   if(inStopLoss!=0)
+     {
+
+      stoploss=price-inStopLoss;
+
+     }
+
+   if(inTakeProfit!=0)
+     {
+
+      takeprofit=price+inTakeProfit;
+
+     }
+
+   if(inLotsIncrease==1)
+     {
+
+
+      for(int i=0; i<ArraySize(lotStorage)-1;i++)
+        {
+
+         if(lotStorage[i]!=0)
+           {
+
+            manualLots=lotStorage[i];
+
+            int ticket=OrderSend(Symbol(),OP_BUYSTOP,manualLots,price,3,NormalizeDouble(stoploss,Digits),takeprofit,NULL,magic,0,clrNONE);
+
+            if(ticket<0)
+              {
+               Alert(GetLastError());
+               return false;
+              }
+            orderSuccess=true;
+
+           }
+        }
+
+     }
+   else
+     {
+
+      int ticket=OrderSend(Symbol(),OP_BUYSTOP,inLots,price,3,NormalizeDouble(stoploss,Digits),takeprofit,NULL,magic,0,clrNONE);
+
+      if(ticket<0)
+        {
+         Alert(GetLastError());
+         return false;
+        }
+      orderSuccess=true;
+
+     }
+
+   return orderSuccess;
+
+  }
+//+------------------------------------------------------------------+
+//|  Eine Buystop Order zu gegebenem Kurs und gegebenen Lots         |
+//+------------------------------------------------------------------+
+bool buyStopOrder(double lots,double price,int magic)
+  {
+
+   double stoploss=0;
+   double takeprofit=0;
+
+   if(inStopLoss!=0)
+     {
+
+      stoploss=price-inStopLoss;
+
+     }
+
+   if(inTakeProfit!=0)
+     {
+
+      takeprofit=price+inTakeProfit;
+
+     }
+
+   int ticket=OrderSend(Symbol(),OP_BUYSTOP,lots,price,3,NormalizeDouble(stoploss,Digits),takeprofit,NULL,magic,0,clrNONE);
+
+   if(ticket<0)
+     {
+
+      return false;
+
+     }
+
+   return true;
+
+  }
+//+------------------------------------------------------------------+
+//|   Eine Order auswählen                                           |
+//+------------------------------------------------------------------+
+bool selectOrder(int number,string select,string mode)
+  {
+
+   bool orderSelected=false;
+
+   if(select=="ticket")
+     {
+
+      if(mode=="trades")
+        {
+
+         orderSelected=OrderSelect(number,SELECT_BY_TICKET,MODE_TRADES);
+
+        }
+
+      if(mode=="history")
+        {
+
+         orderSelected=OrderSelect(number,SELECT_BY_TICKET,MODE_HISTORY);
+
+        }
+
+     }
+
+   else if(select=="pos")
+     {
+
+      if(mode=="trades")
+        {
+
+         orderSelected=OrderSelect(number,SELECT_BY_POS,MODE_TRADES);
+        }
+      if(mode=="history")
+        {
+
+         orderSelected=OrderSelect(number,SELECT_BY_POS,MODE_HISTORY);
+
+        }
+     }
+
+   if(!orderSelected)
+     {
+
+      Alert("Fehler beim Auswählen der Order Nummer: ",number);
+
+     }
+
+   return orderSelected;
+
+  }
+//+------------------------------------------------------------------+
+//|       Den gesamten Gewinn aller offenen Orders ausgeben          |
+//+------------------------------------------------------------------+
+double getTotalOrderProfit()
+  {
+
+   double totalProfit=0;
+
+   for(int i=0; i<OrdersTotal();i++)
+     {
+
+      selectOrder(i,p,trades);
+
+      totalProfit+=OrderProfit();
+
+     }
+
+   return totalProfit;
+
+  }
+//+------------------------------------------------------------------+
+//|      Gewinn der aktuell offenen Order in Prozent anzeigen        |
+//+------------------------------------------------------------------+
+double getProfitPercentageOfBalance()
+  {
+
+   double percent=getTotalOrderProfit()/getAccountBalanceFromLastDay();
+
+   percent=10000*percent;
+
+   percent=MathRound(percent);
+
+   double hundred=100; //damit double erhalten 
+
+   return percent/hundred;
+
+  }
+//+------------------------------------------------------------------+
+//|      Gesamten Tagesgewinn in Prozent anzeigen                    |
+//+------------------------------------------------------------------+
+double getTotalProfitPercentageOfToday()
+  {
+
+   double percent=AccountBalance()/getAccountBalanceFromLastDay();
+
+   percent=10000*(percent-1);
+
+   percent=MathRound(percent);
+
+   double hundred=100; //damit double erhalten bleibt
+
+   return percent/hundred;
+
+
+  }
+//+------------------------------------------------------------------+
+//|   Den Stoploss nach dem Aussenstab setzen                        |
+//+------------------------------------------------------------------+
+bool setStopLossByAussenstab(int ticket)
+  {
+
+   selectOrder(ticket,t,trades);
+
+   if(!inAussenstab()) //Nicht innerhalb des Aussenstabes
+     {
+
+      double high= iHigh(Symbol(),PERIOD_CURRENT,ASS);
+      double low = iLow(Symbol(),PERIOD_CURRENT,ASS);
+
+      if(OrderType()==OP_BUY)
+        {
+
+         if(newestClose>high) //Oberhalb von Aussenstab?
+           {
+           
+           Print("Oberhalb von aussenstab");
+
+            if(setStopLoss(ticket,iLow(Symbol(),PERIOD_CURRENT,1)-2)) //Stoploss auf Low von Kerze 1 setzen.
+              {
+
+               //Stoploss erfolgreich gesetzt.
+               return true;
+
+              }
+            else
+              {
+
+               if(setStopLoss(ticket,iLow(Symbol(),PERIOD_CURRENT,1)-stopLossMinDistance)) //Stoploss 5 Punkte tiefer setzen
+                 {
+                  return true;
+                 }
+               else
+                 {
+
+                  if(setStopLoss(ticket,Bid-stopLossMinDistance))
+                    {
+
+                     return true;
+                    }
+                  else
+                    {
+
+                     return false;
+
+                    }
+
+                 }
+
+              }
+
+           }
+
+         if(newestClose<low) //Unterhalb von Aussenstab?
+           {
+           
+           Print("unterhalb von aussenstab");
+
+            //Stoploss beibehalten
+
+            if(setStopLoss(ticket,iLow(Symbol(),PERIOD_CURRENT,ASS+1)-2))
+              {
+               return true;
+              }
+            else
+              {
+               if(setStopLoss(ticket,newestClose-stopLossMinDistance)) //stoploss 5 Punkte unterhalb des letzten Kurses setzen
+                 {
+
+                  return true;
+
+                 }
+               else
+                 {
+
+                  if(setStopLoss(ticket,Ask-stopLossMinDistance)) //Stoploss 5 Punkte unterhalb des Kaufpreises setzten
+                    {
+
+                     return true;
+
+                    }
+                  else
+                    {
+
+                     return false;
+
+                    }
+                 }
+
+              }
+           }
+        }
+
+      if(OrderType()==OP_SELL)
+        {
+
+         if(newestClose<low) //unterhalb von Aussenstab?
+           {
+
+            if(setStopLoss(ticket,iHigh(Symbol(),PERIOD_CURRENT,1)+2)) //Stoploss auf High von Kerze 1 setzen.
+              {
+
+               //Stoploss erfolgreich gesetzt.
+               return true;
+
+              }
+            else
+              {
+
+               if(setStopLoss(ticket,iHigh(Symbol(),PERIOD_CURRENT,1)+stopLossMinDistance)) //Stoploss 5 Punkte höher setzen
+                 {
+                  return true;
+                 }
+               else
+                 {
+                  if(setStopLoss(ticket,Bid+stopLossMinDistance))
+                    {
+                     return true;
+
+                    }
+
+                  else
+                    {
+
+                     return false;     //kein Stoploss möglich
+
+                    }
+                 }
+
+              }
+
+           }
+
+         if(newestClose>high) //oberhalb von Aussenstab?
+           {
+
+            if(setStopLoss(ticket,iHigh(Symbol(),PERIOD_CURRENT,ASS+1)+2))
+              {
+
+               return true;
+
+              }
+
+            else
+              {
+
+               if(setStopLoss(ticket,newestClose+5)) //stoploss 5 Punkte oberhalb des letzten Kurses setzen
+                 {
+
+                  return true;
+
+                 }
+               else
+                 {
+
+                  if(setStopLoss(ticket,Bid+5)) //Stoploss 5 Punkte oberhalb des Kaufpreises setzten
+                    {
+
+                     return true;
+
+                    }
+                  else
+                    {
+
+                     return false;
+
+                    }
+                 }
+
+              }
+           }
+
+        }
+
+     }
+
+   if(inAussenstab())
+     {
+      double highBefore= iHigh(Symbol(),PERIOD_CURRENT,ASS+1);
+      double lowBefore = iLow(Symbol(),PERIOD_CURRENT,ASS+1);
+
+      if(highBefore<iHigh(Symbol(),PERIOD_CURRENT,ASS)) //ist das high kleiner als das High des Außenstabes?
+        {
+
+         highBefore=iHigh(Symbol(),PERIOD_CURRENT,ASS)+stopLossMinDistance;    //MinDistance aufaddieren
+
+        }
+
+      if(lowBefore>iLow(Symbol(),PERIOD_CURRENT,ASS)) //ist das low größer als das low des Außenstabes?
+        {
+         lowBefore=iLow(Symbol(),PERIOD_CURRENT,ASS)-stopLossMinDistance;      //MinDistance abziehen
+        }
+
+      if(OrderType()==OP_BUY)
+        {
+
+         if(setStopLoss(ticket,lowBefore-2))
+           {
+
+            return true;
+
+           }
+         else
+           {
+
+            if(setStopLoss(ticket,lowBefore-stopLossMinDistance))
+              {
+               return true;
+              }
+            else
+              {
+
+               if(setStopLoss(ticket,Ask-stopLossMinDistance))
+                 {
+                  return true;
+
+                 }
+               else
+                 {
+                  return false;
+                 }
+              }
+
+           }
+
+        }
+
+      if(OrderType()==OP_SELL)
+        {
+
+         if(setStopLoss(ticket,highBefore+2))
+           {
+
+            return true;
+
+           }
+         else
+           {
+
+            if(setStopLoss(ticket,highBefore+stopLossMinDistance))
+              {
+               return true;
+
+
+              }
+            else
+              {
+
+               if(setStopLoss(ticket,Bid+stopLossMinDistance))
+                 {
+                  return true;
+                 }
+               else
+                 {
+                  return false;
+                 }
+              }
+
+           }
+
+        }
+
+     }
+
+   return false;
+
+  }
+//+------------------------------------------------------------------+
+//|   Takeprofit setzen                                              |
+//+------------------------------------------------------------------+
+bool setTakeProfit(int ticket,double takeprofit)
+  {
+
+   selectOrder(ticket,t,trades);
+
+   bool orderModified=true;
+
+   if(OrderTakeProfit()!=takeprofit) //ist takeprofit ein neuer Wert?
+     {
+
+      orderModified=OrderModify(ticket,OrderOpenPrice(),OrderStopLoss(),takeprofit,0,clrNONE);
+     }
+
+   if(!orderModified)
+     {
+      return false;
+     }
+   else
+     {
+      return true;
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|   Stoploss setzen                                                |
+//+------------------------------------------------------------------+
+bool setStopLoss(int ticket,double stoploss) //Setzt Stoploss bei übergebenen Order
+  {
+
+   selectOrder(ticket,t,trades);
+
+   bool orderModified=true;
+
+   if(OrderStopLoss()!=stoploss && checkOrderSymbol(ticket)) //ist stopLoss ein neuer Wert?
+     {
+
+      orderModified=OrderModify(ticket,OrderOpenPrice(),stoploss,OrderTakeProfit(),0,clrNONE);
+     }
+
+   if(!orderModified)
+     {
+      return false;
+     }
+   else
+     {
+      return true;
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|   Überprüfen ob Stoploss nicht in die Parade fährt               |
+//+------------------------------------------------------------------+
+bool checkValidStopLoss(int ticket,double stoploss)
+  {
+
+   selectOrder(ticket,t,trades);
+
+   if(OrderType()==OP_BUY && checkOrderSymbol(ticket))
+     {
+
+      if(OrderSymbol()=="EURUSD")
+        {
+         if(Ask-stoploss<stopLossMinDistance/10000)
+           {
+            return false;
+           }
+
+        }
+
+      if(OrderSymbol()=="DAX30")
+        {
+         if(Ask-stoploss<stopLossMinDistance)
+           {
+
+            return false;
+           }
+
+        }
+
+     }
+
+   if(OrderType()==OP_SELL && checkOrderSymbol(ticket))
+     {
+
+      if(OrderSymbol()=="EURUSD")
+        {
+         if(stoploss-Bid<stopLossMinDistance/10000)
+           {
+            return false;
+           }
+
+        }
+
+      if(OrderSymbol()=="DAX30")
+        {
+
+         if(stoploss-Bid<stopLossMinDistance)
+           {
+
+            return false;
+           }
+
+        }
+
+     }
+
+   return true;
+
+  }
+//+------------------------------------------------------------------+
+//|  Korrektes Symbol für die Order?                                 |
+//+------------------------------------------------------------------+
+bool checkOrderSymbol(int ticket)
+  {
+
+   selectOrder(ticket,t,trades);
+
+   if(Symbol()==OrderSymbol())
+     {
+
+      return true;
+     }
+
+   return false;
+
+
+  }
+//+------------------------------------------------------------------+
+//|         Fehler Verwalten                                         |
+//+------------------------------------------------------------------+
+void ErrorManager()
+  {
+//TODO
+  }
+//+------------------------------------------------------------------+
+//|     Anzahl der offenen Orders eines Symbols zählen               |
+//+------------------------------------------------------------------+
+int countOrders(string symbol)
+  {
+
+   int n=0;
+
+   for(int i=0; i<OrdersTotal();i++)
+     {
+
+      selectOrder(i,p,trades);
+
+      if(OrderSymbol()==symbol)
+        {
+         n++;
+        }
+
+     }
+
+   return n;
+
+  }
+//Den höchsten Wert von n candles zurückgeben
+double getMax(int candles)
+  {
+
+   double max=0;
+
+   for(int i=1; i<candles; i++)
+     {
+
+      if(iHigh(Symbol(),PERIOD_CURRENT,i)>max)
+        {
+
+         max=iHigh(Symbol(),PERIOD_CURRENT,i);
+
+        }
+
+     }
+
+   return max;
+
+  }
+//Den niedrigsten Wert von n candles zurückgeben
+double getMin(int candles)
+  {
+
+   double min=1000000;
+
+   for(int i=1; i<candles; i++)
+     {
+
+      if(iLow(Symbol(),PERIOD_CURRENT,i)<min)
+        {
+
+         min=iLow(Symbol(),PERIOD_CURRENT,i);
+
+        }
+
+     }
+
+   return min;
+
+  }
+//+------------------------------------------------------------------+
+//|  Überprüfen ob Kurs ober- oder unterhalb des MA                  |
+//+------------------------------------------------------------------+
+
+bool checkMovingAverage(ENUM_TIMEFRAMES timeframe,int periods,ENUM_MA_METHOD method)
+  {
+
+   bool errorOnInit=false;
+
+   double ma=iMA(Symbol(),timeframe,periods,0,method,PRICE_CLOSE,0);
+
+   if(Close[0]>ma)
+     {
+
+      return true;
+
+     }
+
+   else if(Close[0]<ma)
+     {
+      return false;
+
+     }
+
+   else
+     {
+      return false;
+
+     }
+   return false;
+  }
+
+//+------------------------------------------------------------------+
